@@ -280,3 +280,6 @@ revoke all on function public.create_meetcute(jsonb), public.get_meetcute(text),
   public.delete_response(text, text, text), public.lock_meetcute(text, text, jsonb) from public;
 grant execute on function public.create_meetcute(jsonb), public.get_meetcute(text), public.upsert_response(text, jsonb),
   public.delete_response(text, text, text), public.lock_meetcute(text, text, jsonb) to anon, authenticated;
+
+-- Tell Supabase's API to pick up the functions above right away.
+notify pgrst, 'reload schema';
