@@ -1,15 +1,15 @@
-# 🙌 MeetCute
+# MeetCute
 
 *Get the crew together.* A playful way for a group of friends to agree on when to hang out.
 
-1. **Create**: name your MeetCute (or roll the 🎲), pick an emoji, and choose dates on the calendar.
+1. **Create**: name your MeetCute (or get a suggestion), pick an icon, and choose dates on the calendar.
    Ask about **dates only** or **dates & times** (with Morning / Afternoon / Evening presets and 15/30/60-minute slots).
 2. **Share**: copy the link to your friends, send it by text or email, or use your phone's share sheet. Link previews show the MeetCute's name.
-3. **Respond**: each person types their name and click-drags (or taps) to paint ✅ *I'm free* or 🤞 *If needed*.
+3. **Respond**: each person types their name and click-drags (or taps) to mark *I'm free* or *If needed*.
    Typing the same name later brings back that person's picks so they can edit them.
-4. **Best times**: a live heatmap, a "squad sync" score, and the top 3 time windows. Back-to-back slots are
-   merged, so you see "Sat 2pm–4:30pm" instead of five separate rows. Slots where everyone is free get a 🙌.
-5. **Lock it in 📌**: the organizer picks the winner. Everyone sees an "It's a plan!" banner with
+4. **Best times**: a live heatmap, a "group overlap" score, and the top 3 time windows. Back-to-back slots are
+   merged, so you see "Sat 2pm–4:30pm" instead of five separate rows. Slots where everyone is free get a check mark.
+5. **Lock it in**: the organizer picks the winner. Everyone sees an "It's a plan!" banner with
    Add to Google Calendar and .ics download buttons.
 
 The organizer's browser remembers that they created the MeetCute. They also get a secret **organizer link**
@@ -78,7 +78,8 @@ Environment variables:
 - `public/app.js`: the single-page front end in plain JavaScript (create, respond, results). It uses Supabase
   when `public/config.js` is filled in (as it is on GitHub Pages), and the local server otherwise. MeetCute links look like `?m=abc123`.
 - `.github/workflows/pages.yml`: runs all tests (including the database tests) and deploys to Pages.
-- `public/styles.css`: the look, with dark mode and reduced-motion support.
+- `public/icons.js`: the flat line icons used throughout.
+- `public/styles.css`: the look (warm earth palette, Fraunces and DM Sans), with dark mode and reduced-motion support.
 
 ### Local server API
 

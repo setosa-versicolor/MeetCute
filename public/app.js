@@ -2,6 +2,7 @@
   'use strict';
 
   const S = window.MeetCuteSlots;
+  const { icon, eventIcon, EVENT_ICONS } = window.MeetCuteIcons;
   const app = document.getElementById('app');
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const myTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
@@ -48,7 +49,7 @@
       try {
         res = await fetch(`${supabaseUrl.replace(/\/+$/, '')}/rest/v1/rpc/${fn}`, { method: 'POST', headers, body: JSON.stringify(args) });
       } catch {
-        throw new Error('Can’t reach the server. Check your connection? 📡');
+        throw new Error('Can’t reach the server. Check your connection and try again.');
       }
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error((data && data.message) || 'Something went wrong');
@@ -93,10 +94,13 @@
   const homeUrl = () => location.origin + location.pathname;
   const meetcuteUrl = (id) => `${homeUrl()}?m=${encodeURIComponent(id)}`;
 
+  // Messages from the database may still carry an emoji; keep the UI emoji-free.
+  const plain = (s) => String(s).replace(/\s*[\p{Extended_Pictographic}\u200d\ufe0f]+/gu, '').trim();
+
   let toastTimer;
   function toast(msg) {
     const el = document.getElementById('toast');
-    el.textContent = msg;
+    el.textContent = plain(msg);
     el.classList.add('show');
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
@@ -119,7 +123,7 @@
       document.execCommand('copy');
       ta.remove();
     }
-    toast(msg || 'Copied! 📋');
+    toast(msg || 'Copied');
   }
 
   // ---------- dates & formatting ----------
@@ -166,38 +170,33 @@
   // ---------- personality ----------
 
   const TAGLINES = [
-    'Find the time that works for the whole crew.',
     'Because “when works for everyone?” shouldn’t take 47 texts.',
-    'Herding friends, made easy.',
-    'Less back-and-forth, more hanging out.',
-    'Your group chat’s new favorite planner.',
+    'Less back-and-forth, more time together.',
+    'Pick a few options, share a link, and let the overlap decide.',
+    'The easy way to get friends in the same place.',
   ];
 
   const NAME_IDEAS = [
-    ['Taco Tuesday Summit', '🌮'], ['Operation: Brunch', '🥞'], ['The Great Game Night', '🎲'],
-    ['Karaoke Confessions', '🎤'], ['Hike & Seek', '🥾'], ['Pizza Party Protocol', '🍕'],
-    ['Book Club (We Read It, We Swear)', '📚'], ['Friendsgiving', '🦃'], ['Movie Marathon', '🎬'],
-    ['Coffee & Chaos', '☕'], ['Trivia Night Dream Team', '🧠'], ['Sushi Rendezvous', '🍣'],
-    ['Weekend Getaway Plotting', '🏕️'], ['Birthday Bash Planning', '🎂'], ['Happy Hour Huddle', '🍻'],
-    ['Picnic in the Park', '🧺'], ['Escape Room Heist', '🔐'], ['Cookie Bake-Off', '🍪'],
+    ['Taco Tuesday Summit', 'utensils'], ['Operation: Brunch', 'coffee'], ['The Great Game Night', 'dice'],
+    ['Karaoke Confessions', 'music'], ['Hike & Seek', 'mountain'], ['Pizza Party Protocol', 'utensils'],
+    ['Book Club (We Read It, We Swear)', 'book'], ['Friendsgiving', 'home'], ['Movie Marathon', 'film'],
+    ['Coffee & Chaos', 'coffee'], ['Trivia Night Dream Team', 'trophy'], ['Sushi Rendezvous', 'utensils'],
+    ['Weekend Getaway Plotting', 'tent'], ['Birthday Bash Planning', 'cake'], ['Happy Hour Huddle', 'wine'],
+    ['Picnic in the Park', 'map-pin'], ['Escape Room Heist', 'dice'], ['Cookie Bake-Off', 'home'],
   ];
 
-  const EMOJIS = ['🙌', '🍕', '🍻', '☕', '🎲', '🎉', '🎬', '🥾', '🍣', '🎤', '🏕️', '🧁', '⚽', '🎮', '📚', '🌮'];
-
   const SAVE_LINES = [
-    'Saved! The squad thanks you 🙏', 'You’re a legend 🏆', 'Got it! High five ✋',
-    'Noted. Friendship level up ⬆️', 'Saved! You make planning easy 😎', 'Locked and loaded 🚀',
-    'Teamwork makes the dream work 🤝',
+    'Saved. Thanks for weighing in.', 'Got it. You’re all set.', 'Saved. The group thanks you.',
+    'Noted. Planning just got easier.', 'Saved. One step closer to a plan.',
   ];
 
   const EMPTY_LINES = [
-    'No one has responded yet. Time to nudge the group chat 👀',
-    'Crickets so far 🦗 Send that link around!',
-    'Still waiting on the first response. Someone’s always fashionably late ⏰',
+    'No responses yet. Share the link to get things going.',
+    'Quiet so far. Send the link around and check back soon.',
+    'Waiting on the first response. Someone’s always fashionably late.',
   ];
 
-  const AVATARS = ['🦊', '🐼', '🐸', '🦄', '🐙', '🐝', '🦉', '🐧', '🐨', '🦁', '🐯', '🐻', '🐰', '🦋', '🐢', '🐳', '🦩', '🦦', '🐞', '🐲'];
-  const AVATAR_HUES = [340, 12, 35, 150, 190, 220, 265, 300];
+  const AVATAR_TONES = 6;
 
   function hash(str) {
     let x = 2166136261;
@@ -205,19 +204,23 @@
     return x >>> 0;
   }
 
+  function initials(name) {
+    const words = name.trim().split(/\s+/).filter(Boolean);
+    const letters = words.length > 1 ? [words[0], words[words.length - 1]] : words;
+    return letters.map((w) => [...w][0] || '').join('').toLocaleUpperCase();
+  }
+
   function avatar(name, size = '') {
-    const n = hash(name);
-    const el = h('span', { class: `avatar ${size}`, title: name, 'aria-hidden': 'true' }, AVATARS[n % AVATARS.length]);
-    el.style.setProperty('--hue', AVATAR_HUES[(n >> 8) % AVATAR_HUES.length]);
-    return el;
+    const tone = hash(name) % AVATAR_TONES;
+    return h('span', { class: `avatar tone-${tone} ${size}`, title: name, 'aria-hidden': 'true' }, initials(name));
   }
 
   function chemistryLabel(pct) {
-    if (pct >= 100) return 'The whole crew’s in! 🙌';
-    if (pct >= 80) return 'Almost everyone 🔥';
-    if (pct >= 60) return 'Looking good 😊';
-    if (pct >= 40) return 'Getting there 🤔';
-    return 'Herding cats 🐈';
+    if (pct >= 100) return 'Everyone’s in';
+    if (pct >= 80) return 'Nearly everyone';
+    if (pct >= 60) return 'Looking good';
+    if (pct >= 40) return 'Getting there';
+    return 'Still coming together';
   }
 
   // ---------- confetti ----------
@@ -237,15 +240,17 @@
         ctx.globalAlpha = Math.min(1, p.life / 40);
         ctx.translate(p.x, p.y);
         ctx.rotate(p.rot);
-        ctx.font = `${p.size}px serif`;
-        ctx.fillText(p.char, -p.size / 2, p.size / 2);
+        ctx.fillStyle = p.color;
+        if (p.round) { ctx.beginPath(); ctx.arc(0, 0, p.size / 2, 0, Math.PI * 2); ctx.fill(); }
+        else ctx.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2);
         ctx.restore();
       }
       if (parts.length) requestAnimationFrame(frame);
       else { running = false; ctx.clearRect(0, 0, width, height); }
     }
 
-    return function burst({ x, y, count = 40, chars = ['🎉', '✨', '🙌', '🥳', '🎊'] } = {}) {
+    const COLORS = ['#b5583a', '#c08a2b', '#5f7148', '#d6bf9c', '#8a5a3c'];
+    return function burst({ x, y, count = 40 } = {}) {
       if (reducedMotion) return;
       const dpr = window.devicePixelRatio || 1;
       canvas.width = innerWidth * dpr;
@@ -258,17 +263,12 @@
         parts.push({
           x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 6 * dpr,
           rot: Math.random() * 6, vr: (Math.random() - 0.5) * 0.2,
-          size: (16 + Math.random() * 18) * dpr, char: pick(chars), life: 140 + Math.random() * 60,
+          size: (6 + Math.random() * 6) * dpr, color: pick(COLORS), round: Math.random() < 0.3, life: 140 + Math.random() * 60,
         });
       }
       if (!running) { running = true; requestAnimationFrame(frame); }
     };
   })();
-
-  function burstFrom(el, opts) {
-    const r = el.getBoundingClientRect();
-    confetti({ x: r.left + r.width / 2, y: r.top + r.height / 2, ...opts });
-  }
 
   // ---------- drag-to-paint ----------
 
@@ -353,39 +353,40 @@
   // =====================================================================
 
   function showCreate() {
-    document.title = 'MeetCute 🙌 Get the crew together';
+    document.title = 'MeetCute · Find a time that works for everyone';
     const now = new Date();
     const draft = {
-      title: '', description: '', host: store.get('mc-name') || '', emoji: '🙌',
+      title: '', description: '', host: store.get('mc-name') || '', emoji: 'users',
       mode: 'dates', dates: new Set(),
       startTime: '09:00', endTime: '17:00', slotMinutes: 60,
       month: new Date(now.getFullYear(), now.getMonth(), 1),
     };
 
-    // --- name + emoji ---
+    // --- name + icon ---
     const titleInput = h('input', {
       id: 'mc-title', class: 'input big', maxlength: 80, autocomplete: 'off',
       placeholder: 'e.g. Taco Tuesday Summit', oninput: (e) => { draft.title = e.target.value; },
     });
-    const emojiBtns = EMOJIS.map((em) => h('button', {
-      type: 'button', class: 'emoji-btn' + (em === draft.emoji ? ' on' : ''), 'aria-label': `Use ${em}`,
-      onclick: () => setEmoji(em),
-    }, em));
-    function setEmoji(em) {
-      draft.emoji = em;
-      emojiBtns.forEach((b) => b.classList.toggle('on', b.textContent === em));
-      emojiPreview.textContent = em;
+    // The chosen icon's key is stored in the MeetCute's "emoji" field.
+    const iconBtns = EVENT_ICONS.map(([key, label]) => h('button', {
+      type: 'button', class: 'icon-choice' + (key === draft.emoji ? ' on' : ''), 'aria-label': label, title: label,
+      'aria-pressed': String(key === draft.emoji), dataset: { icon: key },
+      onclick: () => setIcon(key),
+    }, icon(key)));
+    const iconPreview = h('span', { class: 'event-icon', 'aria-hidden': 'true' }, icon(draft.emoji));
+    function setIcon(key) {
+      draft.emoji = key;
+      iconBtns.forEach((b) => { const on = b.dataset.icon === key; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
+      iconPreview.replaceChildren(icon(key));
     }
-    const emojiPreview = h('span', { class: 'emoji-preview', 'aria-hidden': 'true' }, draft.emoji);
     const dice = h('button', {
-      type: 'button', class: 'btn icon', title: 'Surprise me', 'aria-label': 'Suggest a fun name',
+      type: 'button', class: 'btn icon-only', title: 'Suggest a name', 'aria-label': 'Suggest a name',
       onclick: () => {
-        const [name, em] = pick(NAME_IDEAS.filter(([n]) => n !== draft.title));
+        const [name, key] = pick(NAME_IDEAS.filter(([n]) => n !== draft.title));
         draft.title = titleInput.value = name;
-        if (EMOJIS.includes(em)) setEmoji(em); else { draft.emoji = em; emojiPreview.textContent = em; emojiBtns.forEach((b) => b.classList.remove('on')); }
-        dice.classList.remove('roll'); void dice.offsetWidth; dice.classList.add('roll');
+        setIcon(key);
       },
-    }, '🎲');
+    }, icon('shuffle'));
 
     // --- calendar ---
     const calWrap = h('div', { class: 'calendar' });
@@ -419,7 +420,6 @@
           if (on) draft.dates.add(cell.dataset.slot); else draft.dates.delete(cell.dataset.slot);
           cell.classList.toggle('on', on);
           cell.setAttribute('aria-pressed', String(on));
-          if (on && !reducedMotion) { cell.classList.remove('pop'); void cell.offsetWidth; cell.classList.add('pop'); }
           updateSummary();
         },
       });
@@ -427,14 +427,14 @@
       calWrap.replaceChildren(
         h('div', { class: 'cal-head' },
           h('button', {
-            type: 'button', class: 'btn icon', 'aria-label': 'Previous month', disabled: m <= thisMonth,
+            type: 'button', class: 'btn icon-only', 'aria-label': 'Previous month', disabled: m <= thisMonth,
             onclick: () => { draft.month = new Date(m.getFullYear(), m.getMonth() - 1, 1); renderCalendar(); },
-          }, '‹'),
+          }, icon('chevron-left')),
           h('strong', { class: 'cal-title' }, m.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })),
           h('button', {
-            type: 'button', class: 'btn icon', 'aria-label': 'Next month',
+            type: 'button', class: 'btn icon-only', 'aria-label': 'Next month',
             onclick: () => { draft.month = new Date(m.getFullYear(), m.getMonth() + 1, 1); renderCalendar(); },
-          }, '›')),
+          }, icon('chevron-right'))),
         days);
     }
 
@@ -480,18 +480,18 @@
     const setRange = (a, b) => { draft.startTime = startSel.value = a; draft.endTime = endSel.value = b; updateSummary(); };
     const timePanel = h('div', { class: 'time-panel', hidden: true },
       h('div', { class: 'chips' },
-        h('button', { type: 'button', class: 'chip', onclick: () => setRange('08:00', '12:00') }, '🌅 Morning'),
-        h('button', { type: 'button', class: 'chip', onclick: () => setRange('12:00', '17:00') }, '☀️ Afternoon'),
-        h('button', { type: 'button', class: 'chip', onclick: () => setRange('17:00', '22:00') }, '🌙 Evening'),
-        h('button', { type: 'button', class: 'chip', onclick: () => setRange('08:00', '22:00') }, '🌈 All day')),
+        h('button', { type: 'button', class: 'chip', onclick: () => setRange('08:00', '12:00') }, icon('sunrise'), 'Morning'),
+        h('button', { type: 'button', class: 'chip', onclick: () => setRange('12:00', '17:00') }, icon('sun'), 'Afternoon'),
+        h('button', { type: 'button', class: 'chip', onclick: () => setRange('17:00', '22:00') }, icon('moon'), 'Evening'),
+        h('button', { type: 'button', class: 'chip', onclick: () => setRange('08:00', '22:00') }, icon('clock'), 'All day')),
       h('div', { class: 'time-row' },
         h('label', null, 'From', startSel),
         h('label', null, 'To', endSel),
         h('label', null, 'Slots of', slotSel)),
       h('p', { class: 'hint' }, `Times are in your time zone (${myTimeZone}).`));
 
-    const modeBtns = [['dates', '📅', 'Dates only', 'Just figure out which day'], ['times', '⏰', 'Dates & times', 'Pin down the hour too']]
-      .map(([val, icon, label, sub]) => h('button', {
+    const modeBtns = [['dates', 'calendar', 'Dates only', 'Just figure out which day'], ['times', 'clock', 'Dates & times', 'Pin down the hour too']]
+      .map(([val, iconName, label, sub]) => h('button', {
         type: 'button', class: 'mode-btn' + (draft.mode === val ? ' on' : ''), role: 'radio',
         'aria-checked': String(draft.mode === val), dataset: { mode: val },
         onclick: () => {
@@ -500,7 +500,7 @@
           timePanel.hidden = val !== 'times';
           updateSummary();
         },
-      }, h('span', { class: 'mode-icon' }, icon), h('strong', null, label), h('small', null, sub)));
+      }, h('span', { class: 'mode-icon' }, icon(iconName)), h('strong', null, label), h('small', null, sub)));
 
     function slotCount() {
       if (draft.mode !== 'times') return draft.dates.size;
@@ -515,7 +515,7 @@
         const rows = S.timeRows({ mode: 'times', startTime: draft.startTime, endTime: draft.endTime, slotMinutes: draft.slotMinutes }).length;
         txt += rows ? ` × ${rows} time slots = ${slotCount()} options` : ' · (pick an end time after the start time)';
       }
-      dateSummary.textContent = txt + (n > 1 ? ' 👌' : '');
+      dateSummary.textContent = txt;
     }
 
     const descInput = h('textarea', {
@@ -527,7 +527,7 @@
       oninput: (e) => { draft.host = e.target.value; },
     });
 
-    const submit = h('button', { type: 'submit', class: 'btn primary big' }, 'Create my MeetCute ✨');
+    const submit = h('button', { type: 'submit', class: 'btn primary big' }, 'Create MeetCute');
     const errorEl = h('p', { class: 'error', role: 'alert' });
 
     const form = h('form', {
@@ -535,11 +535,11 @@
       onsubmit: async (e) => {
         e.preventDefault();
         errorEl.textContent = '';
-        if (!draft.title.trim()) { errorEl.textContent = 'Every great story needs a name 📖'; return shake(titleInput); }
-        if (!draft.dates.size) { errorEl.textContent = 'Pick at least one date 📅'; calWrap.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
-        if (draft.mode === 'times' && S.timeToMin(draft.endTime) <= S.timeToMin(draft.startTime)) { errorEl.textContent = 'End time needs to be after the start time ⏰'; return shake(endSel); }
+        if (!draft.title.trim()) { errorEl.textContent = 'Give your MeetCute a name.'; return shake(titleInput); }
+        if (!draft.dates.size) { errorEl.textContent = 'Pick at least one date.'; calWrap.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+        if (draft.mode === 'times' && S.timeToMin(draft.endTime) <= S.timeToMin(draft.startTime)) { errorEl.textContent = 'End time needs to be after the start time.'; return shake(endSel); }
         submit.disabled = true;
-        submit.textContent = 'Rallying the troops… 📣';
+        submit.textContent = 'Creating…';
         try {
           if (draft.host.trim()) store.set('mc-name', draft.host.trim());
           const { meetcute, adminKey } = await backend.create({
@@ -553,16 +553,16 @@
           confetti({ count: 70 });
           navigate('?m=' + encodeURIComponent(meetcute.id));
         } catch (err) {
-          errorEl.textContent = err.message;
+          errorEl.textContent = plain(err.message);
           submit.disabled = false;
-          submit.textContent = 'Create my MeetCute ✨';
+          submit.textContent = 'Create MeetCute';
         }
       },
     },
     h('section', { class: 'card step' },
       h('h2', null, h('span', { class: 'step-num' }, '1'), 'Name it'),
-      h('div', { class: 'title-row' }, emojiPreview, titleInput, dice),
-      h('div', { class: 'emoji-row', role: 'group', 'aria-label': 'Pick an emoji' }, emojiBtns),
+      h('div', { class: 'title-row' }, iconPreview, titleInput, dice),
+      h('div', { class: 'icon-row', role: 'group', 'aria-label': 'Pick an icon' }, iconBtns),
       h('label', { class: 'field' }, h('span', null, 'Your name'), hostInput),
       h('label', { class: 'field' }, h('span', null, 'Details'), descInput)),
     h('section', { class: 'card step' },
@@ -579,12 +579,12 @@
 
     app.replaceChildren(
       h('section', { class: 'hero' },
-        h('h1', null, 'Let’s get the crew together ', h('span', { class: 'wiggle' }, '🙌')),
+        h('h1', null, 'Find a time that works for everyone.'),
         h('p', { class: 'tagline' }, pick(TAGLINES)),
         h('ol', { class: 'how' },
-          h('li', null, h('span', null, '✍️'), 'Pick some options'),
-          h('li', null, h('span', null, '📲'), 'Share with friends'),
-          h('li', null, h('span', null, '🙌'), 'Find the best time'))),
+          h('li', null, icon('calendar'), 'Pick some options'),
+          h('li', null, icon('share'), 'Share with friends'),
+          h('li', null, icon('check-circle'), 'Find the best time'))),
       form);
     titleInput.focus({ preventScroll: true });
   }
@@ -601,14 +601,14 @@
       store.set('mc-admin-' + id, params.get('admin'));
       history.replaceState(null, '', '?m=' + encodeURIComponent(id));
     }
-    app.replaceChildren(h('div', { class: 'loading' }, h('span', { class: 'beat' }, '🎈'), 'Gathering the gang…'));
+    app.replaceChildren(h('div', { class: 'loading' }, h('span', { class: 'spinner', 'aria-hidden': 'true' }), 'Loading…'));
 
     let mc;
     try {
       ({ meetcute: mc } = await backend.get(id));
     } catch (err) {
       app.replaceChildren(h('section', { class: 'card empty-state' },
-        h('div', { class: 'big-emoji' }, '🤷'), h('h1', null, 'Hmm, no MeetCute here'), h('p', null, err.message),
+        h('div', { class: 'empty-icon' }, icon('search-x')), h('h1', null, 'Hmm, no MeetCute here'), h('p', null, plain(err.message)),
         h('a', { class: 'btn primary', href: './', 'data-link': true }, 'Start a new one')));
       return;
     }
@@ -618,7 +618,7 @@
     const fresh = store.get('mc-fresh-' + id) === '1';
     if (fresh) { try { localStorage.removeItem('mc-fresh-' + id); } catch { /* ignore */ } }
     const shareUrl = meetcuteUrl(id);
-    document.title = `${mc.emoji} ${mc.title} · MeetCute`;
+    document.title = `${mc.title} · MeetCute`;
 
     // --- "mine" state ---
     const mine = { yes: new Set(), maybe: new Set(), note: '' };
@@ -634,18 +634,18 @@
     function renderHeader() {
       const tzNote = mc.mode === 'times'
         ? h('p', { class: 'tz-note' + (mc.timezone !== myTimeZone ? ' warn' : '') },
-          `🕐 Times are in ${mc.timezone.replace(/_/g, ' ')}`,
+          icon('globe'), `Times are in ${mc.timezone.replace(/_/g, ' ')}`,
           mc.timezone !== myTimeZone ? ` (you’re in ${myTimeZone.replace(/_/g, ' ')}, heads up!)` : '')
         : null;
       header.replaceChildren(
-        h('div', { class: 'mc-emoji', 'aria-hidden': 'true' }, mc.emoji),
+        h('div', { class: 'event-icon large', 'aria-hidden': 'true' }, icon(eventIcon(mc.emoji))),
         h('div', { class: 'mc-title-wrap' },
           h('h1', null, mc.title),
           mc.host ? h('p', { class: 'host' }, avatar(mc.host, 'sm'), `Hosted by ${mc.host}`) : null,
           mc.description ? h('p', { class: 'desc' }, mc.description) : null,
           tzNote),
         h('div', { class: 'mc-actions' },
-          h('button', { class: 'btn small', type: 'button', onclick: () => shareMe() }, '📣 Invite friends')));
+          h('button', { class: 'btn small', type: 'button', onclick: () => shareMe() }, icon('share'), 'Invite friends')));
     }
 
     async function shareMe() {
@@ -658,7 +658,7 @@
     }
 
     function inviteText() {
-      return `${mc.emoji} You’re invited: ${mc.title}! ${mc.host ? mc.host + ' wants' : 'We want'} to know when you’re free. Pick your times here 👇`;
+      return `You’re invited: ${mc.title}. ${mc.host ? mc.host + ' wants' : 'We want'} to know when you’re free. Pick your times here:`;
     }
 
     function renderShare(open) {
@@ -666,22 +666,22 @@
       const adminUrl = `${shareUrl}&admin=${encodeURIComponent(adminKey)}`;
       const linkInput = h('input', { class: 'input mono', readonly: true, value: shareUrl, onfocus: (e) => e.target.select(), 'aria-label': 'Share link' });
       sharePanel.replaceChildren(h('section', { class: 'card share-card' + (fresh ? ' fresh' : '') },
-        h('button', { class: 'close', type: 'button', 'aria-label': 'Close', onclick: () => renderShare(false) }, '×'),
-        h('h2', null, fresh ? 'Your MeetCute is ready! 🎉' : 'Rally the crew 📣'),
+        h('button', { class: 'close', type: 'button', 'aria-label': 'Close', onclick: () => renderShare(false) }, icon('x')),
+        h('h2', null, fresh ? 'Your MeetCute is ready' : 'Invite friends'),
         h('p', null, 'Send this link to the group. Anyone with it can add their availability.'),
         h('div', { class: 'copy-row' }, linkInput,
-          h('button', { class: 'btn primary', type: 'button', onclick: (e) => { copy(shareUrl, 'Link copied! Go round up the gang 📣'); burstFrom(e.currentTarget, { count: 14 }); } }, 'Copy link')),
+          h('button', { class: 'btn primary', type: 'button', onclick: () => copy(shareUrl, 'Link copied') }, 'Copy link')),
         h('div', { class: 'chips' },
-          navigator.share ? h('button', { class: 'chip', type: 'button', onclick: shareMe }, '📤 Share…') : null,
-          h('button', { class: 'chip', type: 'button', onclick: () => copy(`${inviteText()}\n${shareUrl}`, 'Invite copied! Paste it in the group chat 💬') }, '💬 Copy invite message'),
-          h('a', { class: 'chip', href: `sms:?&body=${encodeURIComponent(inviteText() + ' ' + shareUrl)}` }, '📱 Text it'),
-          h('a', { class: 'chip', href: `mailto:?subject=${encodeURIComponent(mc.emoji + ' ' + mc.title)}&body=${encodeURIComponent(inviteText() + '\n\n' + shareUrl)}` }, '✉️ Email it')),
+          navigator.share ? h('button', { class: 'chip', type: 'button', onclick: shareMe }, icon('share'), 'Share…') : null,
+          h('button', { class: 'chip', type: 'button', onclick: () => copy(`${inviteText()}\n${shareUrl}`, 'Invite copied. Paste it in your group chat.') }, icon('message'), 'Copy invite message'),
+          h('a', { class: 'chip', href: `sms:?&body=${encodeURIComponent(inviteText() + ' ' + shareUrl)}` }, icon('phone'), 'Text it'),
+          h('a', { class: 'chip', href: `mailto:?subject=${encodeURIComponent(mc.title)}&body=${encodeURIComponent(inviteText() + '\n\n' + shareUrl)}` }, icon('mail'), 'Email it')),
         isAdmin ? h('details', { class: 'admin-link' },
-          h('summary', null, '🤫 Your secret organizer link'),
+          h('summary', null, icon('key'), 'Your private organizer link'),
           h('p', { class: 'hint' }, 'Bookmark this one and keep it to yourself. It lets you lock in the final time and tidy up responses from any device.'),
           h('div', { class: 'copy-row' },
             h('input', { class: 'input mono', readonly: true, value: adminUrl, onfocus: (e) => e.target.select(), 'aria-label': 'Organizer link' }),
-            h('button', { class: 'btn', type: 'button', onclick: () => copy(adminUrl, 'Organizer link copied. Keep it secret, keep it safe 🤫') }, 'Copy'))) : null));
+            h('button', { class: 'btn', type: 'button', onclick: () => copy(adminUrl, 'Organizer link copied. Keep it private.') }, 'Copy'))) : null));
     }
 
     // --- locked banner ---
@@ -689,26 +689,26 @@
       const w = lockedWindow(mc);
       if (!w) { lockBanner.replaceChildren(); return; }
       lockBanner.replaceChildren(h('section', { class: 'card locked-banner' },
-        h('div', { class: 'ring', 'aria-hidden': 'true' }, '📌'),
+        h('div', { class: 'lock-icon', 'aria-hidden': 'true' }, icon('pin')),
         h('div', null,
-          h('p', { class: 'eyebrow' }, 'It’s a plan!'),
+          h('p', { class: 'eyebrow' }, 'It’s a plan'),
           h('h2', null, fmtWindow(mc, w)),
           h('div', { class: 'chips' },
-            h('a', { class: 'chip', href: googleCalUrl(mc, w), target: '_blank', rel: 'noopener' }, '📆 Add to Google Calendar'),
-            h('button', { class: 'chip', type: 'button', onclick: () => downloadIcs(mc, w) }, '🗓️ Download .ics'),
+            h('a', { class: 'chip', href: googleCalUrl(mc, w), target: '_blank', rel: 'noopener' }, icon('calendar-plus'), 'Add to Google Calendar'),
+            h('button', { class: 'chip', type: 'button', onclick: () => downloadIcs(mc, w) }, icon('download'), 'Download .ics'),
             isAdmin ? h('button', { class: 'chip ghost', type: 'button', onclick: () => lockIn(null) }, 'Unlock') : null))));
     }
 
-    async function lockIn(slots, fromEl) {
+    async function lockIn(slots) {
       try {
         ({ meetcute: mc } = await backend.lock(id, adminKey, slots));
         renderLock();
         renderResults();
         if (slots) {
-          confetti({ count: 90, chars: ['🎉', '🥳', '🎊', '✨', '📌'] });
-          toast('It’s official! 📌 Now tell the group.');
+          confetti({ count: 70 });
+          toast('Locked in. Let the group know.');
           lockBanner.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        } else toast('Unlocked. Back to the drawing board ✏️');
+        } else toast('Unlocked. Back to choosing.');
       } catch (err) { toast(err.message); }
     }
 
@@ -721,12 +721,12 @@
     });
     const greet = h('p', { class: 'greet', 'aria-live': 'polite' });
     const noteInput = h('input', {
-      class: 'input', maxlength: 140, placeholder: 'Leave a note for the group (optional) ✏️',
+      class: 'input', maxlength: 140, placeholder: 'Leave a note for the group (optional)',
       oninput: (e) => { mine.note = e.target.value; dirty = true; },
     });
     const myGridHost = h('div', { class: 'grid-host' });
     const myCount = h('span', { class: 'count-pill' });
-    const saveBtn = h('button', { class: 'btn primary big', type: 'button', onclick: () => save() }, 'Save my availability 🙌');
+    const saveBtn = h('button', { class: 'btn primary big', type: 'button', onclick: () => save() }, 'Save availability');
 
     function findResponse(name) {
       const key = name.trim().toLocaleLowerCase();
@@ -744,7 +744,7 @@
         renderMyGrid();
         greet.replaceChildren(avatar(r.name, 'sm'), ` Welcome back, ${r.name}! Here’s what you picked last time.`);
       } else if (announce) {
-        greet.replaceChildren(avatar(name, 'sm'), ` ${pick(['Hi', 'Hey', 'Hello', 'Ooh, hi'])} ${name}! ${pick(['Nice to meet you 👋', 'Tap the times that work 👇', 'Paint your free times below 🎨'])}`);
+        greet.replaceChildren(avatar(name, 'sm'), ` ${pick(['Hi', 'Hey', 'Hello'])}, ${name}. ${pick(['Mark the times that work for you below.', 'Tap or drag to mark when you’re free.'])}`);
       }
       loadedName = name;
     }
@@ -788,7 +788,7 @@
       updateCount();
     }
 
-    const brushBtns = [['yes', '✅', 'I’m free'], ['maybe', '🤞', 'If needed'], ['no', '🧽', 'Erase']].map(([val, icon, label]) =>
+    const brushBtns = [['yes', 'check', 'I’m free'], ['maybe', 'maybe', 'If needed'], ['no', 'eraser', 'Erase']].map(([val, iconName, label]) =>
       h('button', {
         type: 'button', class: `brush brush-${val}` + (brush === val ? ' on' : ''), role: 'radio', 'aria-checked': String(brush === val),
         dataset: { brush: val },
@@ -796,7 +796,7 @@
           brush = val;
           brushBtns.forEach((b) => { const on = b.dataset.brush === val; b.classList.toggle('on', on); b.setAttribute('aria-checked', String(on)); });
         },
-      }, h('span', { 'aria-hidden': 'true' }, icon), label));
+      }, icon(iconName), label));
 
     const fillAll = (kind) => {
       mine.yes.clear(); mine.maybe.clear();
@@ -807,12 +807,12 @@
 
     async function save() {
       const name = nameInput.value.trim();
-      if (!name) { greet.textContent = 'First things first: what’s your name? 😊'; return shake(nameInput); }
+      if (!name) { greet.textContent = 'First things first: what’s your name?'; return shake(nameInput); }
       const existing = findResponse(name);
       if (existing && loadedName !== name && !confirm(`Someone named ${existing.name} already responded. Replace their answers with yours?`)) return;
       const before = bestPct();
       saveBtn.disabled = true;
-      saveBtn.textContent = 'Saving… 💭';
+      saveBtn.textContent = 'Saving…';
       try {
         ({ meetcute: mc } = await backend.respond(id, {
           name, yes: [...mine.yes], maybe: [...mine.maybe], note: mine.note,
@@ -823,18 +823,17 @@
         renderResults();
         const best = computeBest();
         if (best && best.perfect && before < 100) {
-          confetti({ count: 120 });
-          toast(`Everyone’s free ${fmtWindow(mc, best.w)}! It’s happening 🎉`);
+          confetti({ count: 80 });
+          toast(`Everyone’s free ${fmtWindow(mc, best.w)}. That’s the one.`);
         } else {
-          burstFrom(saveBtn);
           toast(pick(SAVE_LINES));
         }
-        if (!mine.yes.size && !mine.maybe.size) toast('Saved… but you’re free never? 🥲 We’ll miss you.');
+        if (!mine.yes.size && !mine.maybe.size) toast('Saved. No times marked, so we’ll miss you this round.');
       } catch (err) {
         toast(err.message);
       } finally {
         saveBtn.disabled = false;
-        saveBtn.textContent = 'Update my availability 🙌';
+        saveBtn.textContent = 'Update availability';
       }
     }
 
@@ -860,7 +859,7 @@
       if (!n) {
         resultsHost.replaceChildren(h('section', { class: 'card results' },
           h('h2', null, 'Group results'),
-          h('div', { class: 'empty-state' }, h('div', { class: 'big-emoji float' }, '📬'), h('p', null, pick(EMPTY_LINES)))));
+          h('div', { class: 'empty-state' }, h('div', { class: 'empty-icon' }, icon('inbox')), h('p', null, pick(EMPTY_LINES)))));
         return;
       }
 
@@ -868,16 +867,17 @@
       const detail = h('div', { class: 'slot-detail', 'aria-live': 'polite' });
       function showDetail(slot) {
         detailSlot = slot;
-        if (!slot) { detail.replaceChildren(h('p', { class: 'hint' }, 'Hover or tap a slot to see who’s in 👀')); return; }
+        if (!slot) { detail.replaceChildren(h('p', { class: 'hint' }, 'Hover or tap a slot to see who’s available.')); return; }
         const i = info.get(slot);
-        const people = (names, cls, label) => names.length
-          ? h('div', { class: 'who ' + cls }, h('strong', null, `${label} (${names.length})`), h('div', { class: 'who-list' }, names.map((nm) => h('span', { class: 'person' }, avatar(nm, 'xs'), nm))))
+        const people = (names, cls, iconName, label) => names.length
+          ? h('div', { class: 'who ' + cls }, h('strong', null, icon(iconName), `${label} (${names.length})`), h('div', { class: 'who-list' }, names.map((nm) => h('span', { class: 'person' }, avatar(nm, 'xs'), nm))))
           : null;
-        detail.replaceChildren(
+        detail.replaceChildren(...[
           h('p', { class: 'detail-title' }, fmtSlot(mc, slot)),
-          people(i.yes, 'yes', '✅ Free'),
-          people(i.maybe, 'maybe', '🤞 If needed'),
-          people(i.no, 'no', '❌ Can’t make it'));
+          people(i.yes, 'yes', 'check-circle', 'Free'),
+          people(i.maybe, 'maybe', 'maybe', 'If needed'),
+          people(i.no, 'no', 'x-circle', 'Can’t make it'),
+        ].filter(Boolean));
       }
 
       const grid = slotGrid(mc, {
@@ -890,7 +890,9 @@
             class: 'cell heat' + (perfect ? ' perfect' : '') + (mc.locked && mc.locked.slots.includes(slot) ? ' locked' : ''),
             dataset: { slot }, tabindex: 0,
             'aria-label': `${fmtSlot(mc, slot)}: ${i.yes.length} free, ${i.maybe.length} if needed`,
-          }, inner, mc.mode === 'times' ? h('span', { class: 'cell-count' }, i.yes.length ? i.yes.length : '') : h('span', { class: 'cell-count' }, `${i.yes.length}/${n}`));
+          }, inner, mc.mode === 'times'
+            ? h('span', { class: 'cell-count' }, perfect ? icon('check') : i.yes.length ? i.yes.length : '')
+            : h('span', { class: 'cell-count' }, perfect ? icon('check') : null, `${i.yes.length}/${n}`));
           c.style.setProperty('--heat', heat.toFixed(3));
           if (focusPerson) {
             const r = mc.responses.find((x) => x.name === focusPerson);
@@ -904,25 +906,24 @@
       grid.addEventListener('click', (e) => { const c = e.target.closest('[data-slot]'); if (c) showDetail(c.dataset.slot); });
       showDetail(detailSlot && info.has(detailSlot) ? detailSlot : null);
 
-      // Chemistry meter.
+      // Overlap meter.
       const best = computeBest();
       const meter = best ? h('div', { class: 'meter' },
-        h('div', { class: 'meter-label' }, h('span', null, 'Squad sync'), h('strong', null, `${best.pct}% · ${chemistryLabel(best.pct)}`)),
+        h('div', { class: 'meter-label' }, h('span', null, 'Group overlap'), h('strong', null, `${best.pct}% · ${chemistryLabel(best.pct)}`)),
         h('div', { class: 'meter-bar', role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-valuenow': best.pct },
           (() => { const f = h('div', { class: 'meter-fill' }); f.style.setProperty('--pct', best.pct + '%'); return f; })())) : null;
 
       // Best times.
-      const medals = ['🥇', '🥈', '🥉'];
       const matches = windows.slice(0, 3).map((w, idx) => {
         const perfect = n >= 2 && w.yes.length === n;
         return h('li', { class: 'match' + (perfect ? ' perfect' : '') },
-          h('span', { class: 'medal', 'aria-hidden': 'true' }, perfect ? '🙌' : medals[idx]),
+          h('span', { class: 'rank', 'aria-hidden': 'true' }, perfect ? icon('check') : String(idx + 1)),
           h('div', { class: 'match-body' },
             h('strong', null, fmtWindow(mc, w)),
             h('span', { class: 'match-sub' },
-              perfect ? 'Everyone’s free! 🎉' : `${w.yes.length} of ${n} free` + (w.maybe.length ? ` · ${w.maybe.length} if needed` : '') + (w.no.length ? ` · missing ${w.no.join(', ')}` : '')),
+              perfect ? 'Everyone’s free' : `${w.yes.length} of ${n} free` + (w.maybe.length ? ` · ${w.maybe.length} if needed` : '') + (w.no.length ? ` · missing ${w.no.join(', ')}` : '')),
             h('span', { class: 'avatars' }, w.yes.map((nm) => avatar(nm, 'xs')))),
-          isAdmin ? h('button', { class: 'btn small', type: 'button', onclick: (e) => lockIn(w.slots, e.currentTarget) }, 'Lock it in 📌') : null);
+          isAdmin ? h('button', { class: 'btn small', type: 'button', onclick: () => lockIn(w.slots) }, icon('pin'), 'Lock it in') : null);
       });
 
       // People.
@@ -946,10 +947,10 @@
               ({ meetcute: mc } = await backend.remove(id, adminKey, r.id));
               if (focusPerson === r.name) focusPerson = null;
               renderResults();
-              toast(`${r.name} has left the chat 👋`);
+              toast(`Removed ${r.name}’s response.`);
             } catch (err) { toast(err.message); }
           },
-        }, '×') : null));
+        }, icon('x')) : null));
 
       function dimFor(name) {
         const r = name && mc.responses.find((x) => x.name === name);
@@ -963,12 +964,12 @@
           h('h2', null, 'Group results'),
           h('span', { class: 'count-pill' }, `${n} ${n === 1 ? 'person' : 'people'} responded`)),
         meter,
-        matches.length ? h('div', null, h('h3', null, 'Best times'), h('ol', { class: 'matches' }, matches)) : h('p', { class: 'hint' }, 'No overlap yet. Keep the faith 🤞'),
+        matches.length ? h('div', null, h('h3', null, 'Best times'), h('ol', { class: 'matches' }, matches)) : h('p', { class: 'hint' }, 'No overlap yet.'),
         h('h3', null, 'Who’s in'),
         h('ul', { class: 'people' }, people),
         h('div', { class: 'heat-legend' },
           h('span', null, 'Fewer'), h('span', { class: 'legend-bar' }), h('span', null, 'More'),
-          n >= 2 ? h('span', { class: 'legend-perfect' }, '🙌 everyone') : null),
+          n >= 2 ? h('span', { class: 'legend-perfect' }, icon('check'), 'Everyone free') : null),
         grid,
         detail));
     }
@@ -998,7 +999,7 @@
         resultsHost));
 
     if (nameInput.value) loadMine(false);
-    if (findResponse(nameInput.value)) saveBtn.textContent = 'Update my availability 🙌';
+    if (findResponse(nameInput.value)) saveBtn.textContent = 'Update availability';
 
     window.onbeforeunload = () => (dirty ? true : undefined);
 
@@ -1014,8 +1015,8 @@
         const lockChanged = JSON.stringify(fresh2.locked) !== JSON.stringify(mc.locked);
         mc = fresh2;
         renderResults();
-        if (lockChanged) { renderLock(); if (mc.locked) confetti({ count: 60, chars: ['🎉', '🥳', '📌'] }); }
-        if (newNames.length) toast(`${newNames.join(', ')} just joined the party 🎉`);
+        if (lockChanged) { renderLock(); if (mc.locked) confetti({ count: 50 }); }
+        if (newNames.length) toast(`${newNames.join(', ')} just responded`);
       } catch { /* offline; try again later */ }
     }, 15000);
   }
@@ -1037,8 +1038,8 @@
   function googleCalUrl(mc, w) {
     const t = eventTimes(mc, w);
     const p = new URLSearchParams({
-      action: 'TEMPLATE', text: `${mc.emoji} ${mc.title}`, dates: `${t.start}/${t.end}`,
-      details: `${mc.description ? mc.description + '\n\n' : ''}Planned with MeetCute 🙌 ${meetcuteUrl(mc.id)}`,
+      action: 'TEMPLATE', text: mc.title, dates: `${t.start}/${t.end}`,
+      details: `${mc.description ? mc.description + '\n\n' : ''}Planned with MeetCute: ${meetcuteUrl(mc.id)}`,
     });
     return 'https://calendar.google.com/calendar/render?' + p;
   }
@@ -1052,8 +1053,8 @@
       `UID:${mc.id}-${t.start}@meetcute`, `DTSTAMP:${stamp}`,
       t.allDay ? `DTSTART;VALUE=DATE:${t.start}` : `DTSTART:${t.start}`,
       t.allDay ? `DTEND;VALUE=DATE:${t.end}` : `DTEND:${t.end}`,
-      `SUMMARY:${esc(mc.emoji + ' ' + mc.title)}`,
-      `DESCRIPTION:${esc((mc.description ? mc.description + '\n\n' : '') + 'Planned with MeetCute 🙌')}`,
+      `SUMMARY:${esc(mc.title)}`,
+      `DESCRIPTION:${esc((mc.description ? mc.description + '\n\n' : '') + 'Planned with MeetCute')}`,
       `URL:${meetcuteUrl(mc.id)}`,
       'END:VEVENT', 'END:VCALENDAR',
     ];
