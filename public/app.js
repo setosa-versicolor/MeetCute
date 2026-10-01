@@ -33,16 +33,65 @@
     set(k, v) { try { localStorage.setItem(k, v); } catch { /* private mode */ } },
   };
 
-  async function api(method, url, body, headers = {}) {
-    const res = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json', ...headers },
-      body: body ? JSON.stringify(body) : undefined,
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || 'Something went wrong');
-    return data;
+  // ---------- backend ----------
+  // With Supabase configured (config.js) the app talks to its database functions,
+  // which is how the GitHub Pages site works. Otherwise it uses the local Node server.
+
+  const CONFIG = window.MEETCUTE_CONFIG || {};
+
+  function supabaseBackend({ supabaseUrl, supabaseKey }) {
+    const headers = { apikey: supabaseKey, 'Content-Type': 'application/json' };
+    // Legacy "anon" keys are JWTs and also go in Authorization; new publishable keys don't.
+    if (supabaseKey.startsWith('eyJ')) headers.Authorization = `Bearer ${supabaseKey}`;
+    async function rpc(fn, args) {
+      let res;
+      try {
+        res = await fetch(`${supabaseUrl.replace(/\/+$/, '')}/rest/v1/rpc/${fn}`, { method: 'POST', headers, body: JSON.stringify(args) });
+      } catch {
+        throw new Error('Can’t reach the server. Check your connection? 📡');
+      }
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error((data && data.message) || 'Something went wrong');
+      return data;
+    }
+    return {
+      create: (fields) => rpc('create_meetcute', { payload: fields }),
+      get: (id) => rpc('get_meetcute', { p_id: id }),
+      respond: (id, body) => rpc('upsert_response', { p_id: id, payload: body }),
+      remove: (id, adminKey, rid) => rpc('delete_response', { p_id: id, p_admin_key: adminKey, p_response_id: rid }),
+      lock: (id, adminKey, slots) => rpc('lock_meetcute', { p_id: id, p_admin_key: adminKey, p_slots: slots }),
+    };
   }
+
+  function localBackend() {
+    async function api(method, url, body, headers = {}) {
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (!data.error && (res.status === 404 || res.status === 405)) throw new Error('MeetCute isn’t connected to a database yet. See the README to finish setup.');
+        throw new Error(data.error || 'Something went wrong');
+      }
+      return data;
+    }
+    const base = (id) => 'api/meetcutes/' + encodeURIComponent(id);
+    return {
+      create: (fields) => api('POST', 'api/meetcutes', fields),
+      get: (id) => api('GET', base(id)),
+      respond: (id, body) => api('PUT', `${base(id)}/responses`, body),
+      remove: (id, adminKey, rid) => api('DELETE', `${base(id)}/responses/${encodeURIComponent(rid)}`, null, { 'X-Admin-Key': adminKey }),
+      lock: (id, adminKey, slots) => api('POST', `${base(id)}/lock`, { slots }, { 'X-Admin-Key': adminKey }),
+    };
+  }
+
+  const backend = CONFIG.supabaseUrl && CONFIG.supabaseKey ? supabaseBackend(CONFIG) : localBackend();
+
+  // Links look like ".../MeetCute/?m=abc123" so they work on static hosting.
+  const homeUrl = () => location.origin + location.pathname;
+  const meetcuteUrl = (id) => `${homeUrl()}?m=${encodeURIComponent(id)}`;
 
   let toastTimer;
   function toast(msg) {
@@ -493,7 +542,7 @@
         submit.textContent = 'Rallying the troops… 📣';
         try {
           if (draft.host.trim()) store.set('mc-name', draft.host.trim());
-          const { meetcute, adminKey } = await api('POST', '/api/meetcutes', {
+          const { meetcute, adminKey } = await backend.create({
             title: draft.title, description: draft.description, host: draft.host, emoji: draft.emoji,
             mode: draft.mode, dates: [...draft.dates].sort(),
             startTime: draft.startTime, endTime: draft.endTime, slotMinutes: draft.slotMinutes,
@@ -502,7 +551,7 @@
           store.set('mc-admin-' + meetcute.id, adminKey);
           store.set('mc-fresh-' + meetcute.id, '1');
           confetti({ count: 70 });
-          navigate('/m/' + meetcute.id);
+          navigate('?m=' + encodeURIComponent(meetcute.id));
         } catch (err) {
           errorEl.textContent = err.message;
           submit.disabled = false;
@@ -550,17 +599,17 @@
     const params = new URLSearchParams(location.search);
     if (params.get('admin')) {
       store.set('mc-admin-' + id, params.get('admin'));
-      history.replaceState(null, '', '/m/' + id);
+      history.replaceState(null, '', '?m=' + encodeURIComponent(id));
     }
     app.replaceChildren(h('div', { class: 'loading' }, h('span', { class: 'beat' }, '🎈'), 'Gathering the gang…'));
 
     let mc;
     try {
-      ({ meetcute: mc } = await api('GET', '/api/meetcutes/' + encodeURIComponent(id)));
+      ({ meetcute: mc } = await backend.get(id));
     } catch (err) {
       app.replaceChildren(h('section', { class: 'card empty-state' },
         h('div', { class: 'big-emoji' }, '🤷'), h('h1', null, 'Hmm, no MeetCute here'), h('p', null, err.message),
-        h('a', { class: 'btn primary', href: '/', 'data-link': true }, 'Start a new one')));
+        h('a', { class: 'btn primary', href: './', 'data-link': true }, 'Start a new one')));
       return;
     }
 
@@ -568,7 +617,7 @@
     const isAdmin = !!adminKey;
     const fresh = store.get('mc-fresh-' + id) === '1';
     if (fresh) { try { localStorage.removeItem('mc-fresh-' + id); } catch { /* ignore */ } }
-    const shareUrl = `${location.origin}/m/${id}`;
+    const shareUrl = meetcuteUrl(id);
     document.title = `${mc.emoji} ${mc.title} · MeetCute`;
 
     // --- "mine" state ---
@@ -614,7 +663,7 @@
 
     function renderShare(open) {
       if (!open) { sharePanel.replaceChildren(); return; }
-      const adminUrl = `${shareUrl}?admin=${adminKey}`;
+      const adminUrl = `${shareUrl}&admin=${encodeURIComponent(adminKey)}`;
       const linkInput = h('input', { class: 'input mono', readonly: true, value: shareUrl, onfocus: (e) => e.target.select(), 'aria-label': 'Share link' });
       sharePanel.replaceChildren(h('section', { class: 'card share-card' + (fresh ? ' fresh' : '') },
         h('button', { class: 'close', type: 'button', 'aria-label': 'Close', onclick: () => renderShare(false) }, '×'),
@@ -652,7 +701,7 @@
 
     async function lockIn(slots, fromEl) {
       try {
-        ({ meetcute: mc } = await api('POST', `/api/meetcutes/${id}/lock`, { slots }, { 'X-Admin-Key': adminKey }));
+        ({ meetcute: mc } = await backend.lock(id, adminKey, slots));
         renderLock();
         renderResults();
         if (slots) {
@@ -765,7 +814,7 @@
       saveBtn.disabled = true;
       saveBtn.textContent = 'Saving… 💭';
       try {
-        ({ meetcute: mc } = await api('PUT', `/api/meetcutes/${id}/responses`, {
+        ({ meetcute: mc } = await backend.respond(id, {
           name, yes: [...mine.yes], maybe: [...mine.maybe], note: mine.note,
         }));
         store.set('mc-name', name);
@@ -894,7 +943,7 @@
           onclick: async () => {
             if (!confirm(`Remove ${r.name}’s response?`)) return;
             try {
-              ({ meetcute: mc } = await api('DELETE', `/api/meetcutes/${id}/responses/${r.id}`, null, { 'X-Admin-Key': adminKey }));
+              ({ meetcute: mc } = await backend.remove(id, adminKey, r.id));
               if (focusPerson === r.name) focusPerson = null;
               renderResults();
               toast(`${r.name} has left the chat 👋`);
@@ -956,9 +1005,9 @@
     // Live-ish updates: refresh results while the tab is visible.
     clearInterval(pollTimer);
     pollTimer = setInterval(async () => {
-      if (document.hidden || location.pathname !== '/m/' + id) return;
+      if (document.hidden || currentId() !== id) return;
       try {
-        const { meetcute: fresh2 } = await api('GET', '/api/meetcutes/' + encodeURIComponent(id));
+        const { meetcute: fresh2 } = await backend.get(id);
         const changed = JSON.stringify(fresh2.responses) !== JSON.stringify(mc.responses) || JSON.stringify(fresh2.locked) !== JSON.stringify(mc.locked);
         if (!changed) return;
         const newNames = fresh2.responses.filter((r) => !mc.responses.some((x) => x.id === r.id)).map((r) => r.name);
@@ -989,7 +1038,7 @@
     const t = eventTimes(mc, w);
     const p = new URLSearchParams({
       action: 'TEMPLATE', text: `${mc.emoji} ${mc.title}`, dates: `${t.start}/${t.end}`,
-      details: `${mc.description ? mc.description + '\n\n' : ''}Planned with MeetCute 🙌 ${location.origin}/m/${mc.id}`,
+      details: `${mc.description ? mc.description + '\n\n' : ''}Planned with MeetCute 🙌 ${meetcuteUrl(mc.id)}`,
     });
     return 'https://calendar.google.com/calendar/render?' + p;
   }
@@ -1005,7 +1054,7 @@
       t.allDay ? `DTEND;VALUE=DATE:${t.end}` : `DTEND:${t.end}`,
       `SUMMARY:${esc(mc.emoji + ' ' + mc.title)}`,
       `DESCRIPTION:${esc((mc.description ? mc.description + '\n\n' : '') + 'Planned with MeetCute 🙌')}`,
-      `URL:${location.origin}/m/${mc.id}`,
+      `URL:${meetcuteUrl(mc.id)}`,
       'END:VEVENT', 'END:VCALENDAR',
     ];
     const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar' });
@@ -1017,6 +1066,11 @@
 
   // ---------- routing ----------
 
+  function currentId() {
+    const id = new URLSearchParams(location.search).get('m');
+    return id && /^[A-Za-z0-9_-]{1,40}$/.test(id) ? id : null;
+  }
+
   function navigate(path) {
     history.pushState(null, '', path);
     route();
@@ -1026,8 +1080,8 @@
     clearInterval(pollTimer);
     window.onbeforeunload = null;
     window.scrollTo(0, 0);
-    const m = location.pathname.match(/^\/m\/([A-Za-z0-9_-]+)\/?$/);
-    if (m) showMeetCute(m[1]); else showCreate();
+    const id = currentId();
+    if (id) showMeetCute(id); else showCreate();
   }
 
   document.addEventListener('click', (e) => {

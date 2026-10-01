@@ -8,6 +8,9 @@ const Slots = require('./public/slots.js');
 
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_BODY = 256 * 1024;
+// Default link-preview text in public/index.html, swapped for a MeetCute's own.
+const DEFAULT_TITLE = 'MeetCute 🙌 Get the crew together';
+const DEFAULT_DESC = 'Create a MeetCute, share the link with friends, and find the time that works for everyone.';
 const LIMITS = { title: 80, description: 500, host: 40, name: 40, note: 140, dates: 60, slots: 2500, responses: 200 };
 
 const MIME = {
@@ -189,11 +192,10 @@ function createApp({ dataFile } = {}) {
 
   function renderIndex(res, mc) {
     // Fill in link-preview tags so shared links look nice in group chats.
-    const title = mc ? `${mc.emoji} ${mc.title} · MeetCute` : 'MeetCute 🙌 Get the crew together';
-    const desc = mc
-      ? (mc.host ? `${mc.host} wants to know when you're free. ` : "When are you free? ") + 'Tap to pick your times 👇'
-      : 'Create a MeetCute, share the link with friends, and find the time that works for everyone.';
-    const html = template.replaceAll('{{TITLE}}', escapeHtml(title)).replaceAll('{{DESC}}', escapeHtml(desc));
+    if (!mc) return send(res, 200, template, { 'Content-Type': MIME['.html'] });
+    const title = `${mc.emoji} ${mc.title} · MeetCute`;
+    const desc = (mc.host ? `${mc.host} wants to know when you're free. ` : "When are you free? ") + 'Tap to pick your times 👇';
+    const html = template.replaceAll(DEFAULT_TITLE, escapeHtml(title)).replaceAll(DEFAULT_DESC, escapeHtml(desc));
     send(res, 200, html, { 'Content-Type': MIME['.html'] });
   }
 
@@ -288,8 +290,15 @@ function createApp({ dataFile } = {}) {
       if (parts[0] === 'api') return await handleApi(req, res, parts);
 
       if (req.method !== 'GET' && req.method !== 'HEAD') throw new HttpError(405, 'Method not allowed');
-      if (url.pathname === '/' || url.pathname === '/index.html') return renderIndex(res, null);
-      if (parts[0] === 'm' && parts.length === 2) return renderIndex(res, store.get(parts[1]) || null);
+      if (url.pathname === '/' || url.pathname === '/index.html') {
+        const id = url.searchParams.get('m');
+        return renderIndex(res, (id && store.get(id)) || null);
+      }
+      // Old-style links from before MeetCute moved to ?m= links.
+      if (parts[0] === 'm' && parts.length === 2) {
+        res.writeHead(302, { Location: '/?m=' + encodeURIComponent(parts[1]) });
+        return res.end();
+      }
       return serveStatic(req, res, url.pathname);
     } catch (err) {
       if (!(err instanceof HttpError)) console.error(err);

@@ -15,14 +15,46 @@
 The organizer's browser remembers that they created the MeetCute. They also get a secret **organizer link**
 for using another device. With it they can lock or unlock the final time and remove responses.
 
-## Running it
+## Put it online (GitHub Pages + Supabase)
 
-No dependencies. You need Node 18 or newer.
+GitHub Pages hosts the website. A free [Supabase](https://supabase.com) database stores everyone's responses.
+You only do this once.
+
+**1. Set up the database (about 5 minutes)**
+
+1. Sign up at [supabase.com](https://supabase.com) and create a new project. Any name and region is fine.
+   Save the database password somewhere, though MeetCute doesn't need it.
+2. In the project, open **SQL Editor**, click **New query**, paste in all of
+   [`supabase/schema.sql`](supabase/schema.sql), and click **Run**. It should say "Success. No rows returned".
+3. Open **Project Settings → API Keys** (or click **Connect**) and copy two things:
+   - the **Project URL**, which looks like `https://abcdefghijklm.supabase.co`
+   - the **Publishable key** (`sb_publishable_…`), or on older projects the **anon public** key
+4. Put both into [`public/config.js`](public/config.js) and commit. You can edit the file right on GitHub
+   with the pencil icon. Both values are safe to make public.
+
+**2. Turn on GitHub Pages**
+
+In the GitHub repo, go to **Settings → Pages** and set **Source** to **GitHub Actions**.
+
+Each push to `master` runs the tests and publishes `public/` to
+**https://setosa-versicolor.github.io/MeetCute/**. The **Actions** tab shows progress. If a deploy failed
+before Pages was turned on, open the failed run and click **Re-run all jobs**.
+
+> Free Supabase projects pause after a week with no visits. If the site says it can't reach the server,
+> open your Supabase dashboard and click **Restore project**.
+
+## Running it locally
+
+No dependencies. You need Node 18 or newer. When `public/config.js` is empty, the app uses this local server
+instead of Supabase.
 
 ```bash
 npm start          # http://localhost:3000
 npm test           # API + scheduling logic tests
 ```
+
+To also test the database script, point the tests at any Postgres that has `anon` and `authenticated` roles:
+`MEETCUTE_TEST_PG="-h localhost -U postgres" npm test`. GitHub Actions does this on every push.
 
 Environment variables:
 
@@ -33,14 +65,19 @@ Environment variables:
 
 ## How it's built
 
-- `server.js`: a small `node:http` server. It provides the JSON API, validation, file-backed storage,
-  serves the static files, and fills in link-preview tags.
+- `supabase/schema.sql`: the online database. Browsers can't touch the tables. They can only call five
+  database functions (`create_meetcute`, `get_meetcute`, `upsert_response`, `delete_response` and
+  `lock_meetcute`), which validate input and keep organizer keys secret.
+- `server.js`: a small `node:http` server for local use. It has the same API backed by a JSON file, and it
+  fills in link-preview tags.
 - `public/slots.js`: logic shared by the browser and the server. It builds the slot grid, tallies
   responses, merges and ranks windows, and handles time-zone math for calendar exports.
-- `public/app.js`: the single-page front end in plain JavaScript (create, respond, results).
+- `public/app.js`: the single-page front end in plain JavaScript (create, respond, results). It uses Supabase
+  when `public/config.js` is filled in, and the local server otherwise. MeetCute links look like `?m=abc123`.
+- `.github/workflows/pages.yml`: runs all tests (including the database tests) and deploys to Pages.
 - `public/styles.css`: the look, with dark mode and reduced-motion support.
 
-### API
+### Local server API
 
 | Method | Path | Body |
 |---|---|---|
@@ -53,7 +90,8 @@ Environment variables:
 Times are stored as wall-clock times in the creator's time zone, which is shown on the page.
 People in a different time zone see a heads-up.
 
-### Going to production
+### Good to know
 
-The JSON file store is fine for friends and family. For real traffic, replace `createStore` in
-`server.js` with SQLite or Postgres and add rate limiting in front of the API.
+- On GitHub Pages, shared links preview as the generic "MeetCute" card, because static hosting can't customize
+  previews for each MeetCute. Previews with the MeetCute's own name only work with the local Node server.
+- Anyone with a MeetCute's link can add responses, so share links with your friends rather than posting them publicly.

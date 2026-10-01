@@ -89,10 +89,15 @@ test('unknown MeetCute is a friendly 404', async () => {
 
 test('share page gets link-preview tags with the escaped title', async () => {
   const { json } = await newMc({ title: '<Pizza> & "Friends"' });
-  const page = await call('GET', `/m/${json.meetcute.id}`);
+  const page = await call('GET', `/?m=${json.meetcute.id}`);
   assert.equal(page.status, 200);
   assert.match(page.text, /og:title" content="🎲 &lt;Pizza&gt; &amp; &quot;Friends&quot; · MeetCute"/);
-  assert.doesNotMatch(page.text, /\{\{/);
+  assert.match(page.text, /<title>🎲 &lt;Pizza&gt;/);
+  const home = await call('GET', '/');
+  assert.match(home.text, /<title>MeetCute 🙌 Get the crew together<\/title>/);
+  const old = await fetch(`${base}/m/${json.meetcute.id}`, { redirect: 'manual' });
+  assert.equal(old.status, 302);
+  assert.equal(old.headers.get('location'), `/?m=${json.meetcute.id}`);
 });
 
 test('static files are served and path traversal is blocked', async () => {
