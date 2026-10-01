@@ -290,6 +290,10 @@ function createApp({ dataFile } = {}) {
       if (parts[0] === 'api') return await handleApi(req, res, parts);
 
       if (req.method !== 'GET' && req.method !== 'HEAD') throw new HttpError(405, 'Method not allowed');
+      // Locally, always use this server's own storage rather than the Supabase setup in config.js.
+      if (url.pathname === '/config.js') {
+        return send(res, 200, 'window.MEETCUTE_CONFIG = {};\n', { 'Content-Type': MIME['.js'] });
+      }
       if (url.pathname === '/' || url.pathname === '/index.html') {
         const id = url.searchParams.get('m');
         return renderIndex(res, (id && store.get(id)) || null);

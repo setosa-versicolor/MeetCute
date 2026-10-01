@@ -102,6 +102,7 @@ test('share page gets link-preview tags with the escaped title', async () => {
 
 test('static files are served and path traversal is blocked', async () => {
   assert.equal((await call('GET', '/app.js')).status, 200);
+  assert.equal((await call('GET', '/config.js')).text, 'window.MEETCUTE_CONFIG = {};\n', 'local server ignores the Supabase config');
   assert.equal((await call('GET', '/../server.js')).status, 404);
   assert.equal((await call('GET', '/%2e%2e/server.js')).status, 404);
 });

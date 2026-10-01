@@ -45,8 +45,8 @@ before Pages was turned on, open the failed run and click **Re-run all jobs**.
 
 ## Running it locally
 
-No dependencies. You need Node 18 or newer. When `public/config.js` is empty, the app uses this local server
-instead of Supabase.
+No dependencies. You need Node 18 or newer. The local server ignores `public/config.js` and keeps MeetCutes
+in its own file, so testing locally never touches your real Supabase data.
 
 ```bash
 npm start          # http://localhost:3000
@@ -73,7 +73,7 @@ Environment variables:
 - `public/slots.js`: logic shared by the browser and the server. It builds the slot grid, tallies
   responses, merges and ranks windows, and handles time-zone math for calendar exports.
 - `public/app.js`: the single-page front end in plain JavaScript (create, respond, results). It uses Supabase
-  when `public/config.js` is filled in, and the local server otherwise. MeetCute links look like `?m=abc123`.
+  when `public/config.js` is filled in (as it is on GitHub Pages), and the local server otherwise. MeetCute links look like `?m=abc123`.
 - `.github/workflows/pages.yml`: runs all tests (including the database tests) and deploys to Pages.
 - `public/styles.css`: the look, with dark mode and reduced-motion support.
 
