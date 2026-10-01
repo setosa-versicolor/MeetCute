@@ -22,10 +22,12 @@ You only do this once.
 
 **1. Set up the database (about 5 minutes)**
 
-1. Sign up at [supabase.com](https://supabase.com) and create a new project. Any name and region is fine.
-   Save the database password somewhere, though MeetCute doesn't need it.
+1. Sign up at [supabase.com](https://supabase.com) and create a project, or reuse one you already have.
+   MeetCute keeps its tables in its own `meetcute` schema and won't touch your other apps' tables.
 2. In the project, open **SQL Editor**, click **New query**, paste in all of
    [`supabase/schema.sql`](supabase/schema.sql), and click **Run**. It should say "Success. No rows returned".
+   If your project already has a function with one of MeetCute's five function names, the script stops
+   and changes nothing.
 3. Open **Project Settings → API Keys** (or click **Connect**) and copy two things:
    - the **Project URL**, which looks like `https://abcdefghijklm.supabase.co`
    - the **Publishable key** (`sb_publishable_…`), or on older projects the **anon public** key
@@ -65,7 +67,8 @@ Environment variables:
 
 ## How it's built
 
-- `supabase/schema.sql`: the online database. Browsers can't touch the tables. They can only call five
+- `supabase/schema.sql`: the online database. Tables and helpers live in a separate `meetcute` schema so
+  they can share a Supabase project with other apps. Browsers can't touch the tables. They can only call five
   database functions (`create_meetcute`, `get_meetcute`, `upsert_response`, `delete_response` and
   `lock_meetcute`), which validate input and keep organizer keys secret.
 - `server.js`: a small `node:http` server for local use. It has the same API backed by a JSON file, and it

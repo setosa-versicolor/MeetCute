@@ -11,10 +11,29 @@ const S = require('../public/slots.js');
 
 const PG = process.env.MEETCUTE_TEST_PG;
 const skip = PG ? false : 'set MEETCUTE_TEST_PG to run the database tests';
-const pgArgs = PG ? PG.split(/\s+/).filter(Boolean) : [];
+const adminArgs = PG ? PG.split(/\s+/).filter(Boolean) : [];
+const SCHEMA_FILE = path.join(__dirname, '..', 'supabase', 'schema.sql');
 
-function psql(sql) {
-  return execFileSync('psql', [...pgArgs, '-X', '-q', '-t', '-A', '-v', 'ON_ERROR_STOP=1', '-c', sql], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+// Each run gets fresh databases so leftovers never hide a problem.
+const dbName = (tag) => `meetcute_test_${tag}_${process.pid}`;
+function freshDb(tag) {
+  const name = dbName(tag);
+  execFileSync('psql', [...adminArgs, '-X', '-q', '-d', 'postgres', '-c', `drop database if exists ${name}`, '-c', `create database ${name}`], { stdio: 'pipe' });
+  return [...adminArgs, '-d', name];
+}
+const dropDb = (tag) => execFileSync('psql', [...adminArgs, '-X', '-q', '-d', 'postgres', '-c', `drop database if exists ${dbName(tag)}`], { stdio: 'pipe' });
+
+let pgArgs = [];
+function psql(sql, args = pgArgs) {
+  return execFileSync('psql', [...args, '-X', '-q', '-t', '-A', '-v', 'ON_ERROR_STOP=1', '-c', sql], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+}
+function applySchema(args = pgArgs) {
+  try {
+    execFileSync('psql', [...args, '-X', '-q', '-v', 'ON_ERROR_STOP=1', '-f', SCHEMA_FILE], { stdio: ['ignore', 'pipe', 'pipe'] });
+  } catch (e) {
+    const m = /ERROR:\s+(.*)/.exec(String(e.stderr || e.message));
+    throw new Error(m ? m[1] : String(e));
+  }
 }
 
 const lit = (v) => '$mc$' + (typeof v === 'string' ? v : JSON.stringify(v)) + '$mc$';
@@ -35,9 +54,29 @@ const base = {
   startTime: '18:00', endTime: '21:00', slotMinutes: 30, timezone: 'America/Chicago',
 };
 
-test('schema applies cleanly, twice', { skip }, () => {
-  const file = path.join(__dirname, '..', 'supabase', 'schema.sql');
-  for (let i = 0; i < 2; i++) execFileSync('psql', [...pgArgs, '-X', '-q', '-v', 'ON_ERROR_STOP=1', '-f', file], { stdio: ['ignore', 'pipe', 'pipe'] });
+test.after(() => { if (PG) { dropDb('main'); dropDb('clash'); } });
+
+test('applies next to an existing app without touching it, and can be re-run', { skip }, () => {
+  pgArgs = freshDb('main');
+  // Pretend this Supabase project already runs another app with a "responses" table.
+  psql(`create table public.responses (id serial primary key, answer text);
+        insert into public.responses (answer) values ('keep me');
+        grant select, insert on public.responses to anon;
+        create function public.other_app_fn() returns int language sql as 'select 1';
+        grant execute on function public.other_app_fn() to anon;`);
+  applySchema();
+  applySchema();
+  assert.equal(psql("set role anon; select answer from public.responses;"), 'keep me', 'existing table and its grants are untouched');
+  assert.equal(psql("set role anon; select public.other_app_fn();"), '1', 'existing functions still work');
+  assert.equal(psql("select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'responses';"), '2');
+});
+
+test('stops without changing anything if a public function name clashes', { skip }, () => {
+  const args = freshDb('clash');
+  psql("create function public.get_meetcute(x int) returns int language sql as 'select x';", args);
+  assert.throws(() => applySchema(args), /already has function\(s\) named get_meetcute/);
+  assert.equal(psql("select count(*) from pg_namespace where nspname = 'meetcute';", args), '0');
+  assert.equal(psql("select public.get_meetcute(7);", args), '7');
 });
 
 test('create, fetch, respond, lock and delete through the API', { skip }, () => {
@@ -107,8 +146,8 @@ test('unknown MeetCute is a friendly error', { skip }, () => {
 });
 
 test('the browser role cannot touch tables or helpers directly', { skip }, () => {
-  assert.throws(() => psql('set role anon; select * from public.meetcutes;'), /permission denied/);
-  assert.throws(() => psql('set role anon; select admin_key from public.meetcutes;'), /permission denied/);
-  assert.throws(() => psql("set role anon; insert into public.responses (id, meetcute_id, name, name_key) values ('a','b','c','c');"), /permission denied/);
-  assert.throws(() => psql("set role anon; select meetcute_private.new_id(5);"), /permission denied/);
+  assert.throws(() => psql('set role anon; select * from meetcute.meetcutes;'), /permission denied/);
+  assert.throws(() => psql('set role anon; select admin_key from meetcute.meetcutes;'), /permission denied/);
+  assert.throws(() => psql("set role anon; insert into meetcute.responses (id, meetcute_id, name, name_key) values ('a','b','c','c');"), /permission denied/);
+  assert.throws(() => psql("set role anon; select meetcute.new_id(5);"), /permission denied/);
 });
