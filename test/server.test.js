@@ -84,7 +84,7 @@ test('rejects bad MeetCutes', async () => {
 test('unknown MeetCute is a friendly 404', async () => {
   const r = await call('GET', '/api/meetcutes/doesnotexist');
   assert.equal(r.status, 404);
-  assert.match(r.json.error, /dream/);
+  assert.match(r.json.error, /group chat/);
 });
 
 test('share page gets link-preview tags with the escaped title', async () => {

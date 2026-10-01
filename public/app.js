@@ -117,11 +117,11 @@
   // ---------- personality ----------
 
   const TAGLINES = [
-    'Find the time everyone falls for.',
-    'Scheduling, but make it romantic.',
+    'Find the time that works for the whole crew.',
     'Because “when works for everyone?” shouldn’t take 47 texts.',
-    'Your group chat’s new wingman.',
-    'Swipe right on a time slot.',
+    'Herding friends, made easy.',
+    'Less back-and-forth, more hanging out.',
+    'Your group chat’s new favorite planner.',
   ];
 
   const NAME_IDEAS = [
@@ -133,18 +133,18 @@
     ['Picnic in the Park', '🧺'], ['Escape Room Heist', '🔐'], ['Cookie Bake-Off', '🍪'],
   ];
 
-  const EMOJIS = ['💘', '🍕', '🍻', '☕', '🎲', '🎉', '🎬', '🥾', '🍣', '🎤', '🏕️', '🧁', '⚽', '🎮', '📚', '🌮'];
+  const EMOJIS = ['🙌', '🍕', '🍻', '☕', '🎲', '🎉', '🎬', '🥾', '🍣', '🎤', '🏕️', '🧁', '⚽', '🎮', '📚', '🌮'];
 
   const SAVE_LINES = [
-    'Sealed with a kiss 💋', 'Your calendar is blushing 😊', 'Saved! Playing it cool 😎',
-    'Got it! You’re a catch 🎣', 'Noted with heart eyes 😍', 'Saved. The group thanks you 🙏',
-    'Butterflies confirmed 🦋',
+    'Saved! The squad thanks you 🙏', 'You’re a legend 🏆', 'Got it! High five ✋',
+    'Noted. Friendship level up ⬆️', 'Saved! You make planning easy 😎', 'Locked and loaded 🚀',
+    'Teamwork makes the dream work 🤝',
   ];
 
   const EMPTY_LINES = [
-    'No one has responded yet. They’re playing hard to get 😏',
+    'No one has responded yet. Time to nudge the group chat 👀',
     'Crickets so far 🦗 Send that link around!',
-    'Still waiting on the first response. Patience, cupid 🏹',
+    'Still waiting on the first response. Someone’s always fashionably late ⏰',
   ];
 
   const AVATARS = ['🦊', '🐼', '🐸', '🦄', '🐙', '🐝', '🦉', '🐧', '🐨', '🦁', '🐯', '🐻', '🐰', '🦋', '🐢', '🐳', '🦩', '🦦', '🐞', '🐲'];
@@ -164,11 +164,11 @@
   }
 
   function chemistryLabel(pct) {
-    if (pct >= 100) return 'Soulmates 💞';
-    if (pct >= 80) return 'Sparks flying 🔥';
-    if (pct >= 60) return 'Promising 😊';
-    if (pct >= 40) return 'It’s complicated 🤔';
-    return 'Playing hard to get 🙈';
+    if (pct >= 100) return 'The whole crew’s in! 🙌';
+    if (pct >= 80) return 'Almost everyone 🔥';
+    if (pct >= 60) return 'Looking good 😊';
+    if (pct >= 40) return 'Getting there 🤔';
+    return 'Herding cats 🐈';
   }
 
   // ---------- confetti ----------
@@ -196,7 +196,7 @@
       else { running = false; ctx.clearRect(0, 0, width, height); }
     }
 
-    return function burst({ x, y, count = 40, chars = ['💖', '💕', '💘', '✨', '💗'] } = {}) {
+    return function burst({ x, y, count = 40, chars = ['🎉', '✨', '🙌', '🥳', '🎊'] } = {}) {
       if (reducedMotion) return;
       const dpr = window.devicePixelRatio || 1;
       canvas.width = innerWidth * dpr;
@@ -304,10 +304,10 @@
   // =====================================================================
 
   function showCreate() {
-    document.title = 'MeetCute 💘 Find the time everyone falls for';
+    document.title = 'MeetCute 🙌 Get the crew together';
     const now = new Date();
     const draft = {
-      title: '', description: '', host: store.get('mc-name') || '', emoji: '💘',
+      title: '', description: '', host: store.get('mc-name') || '', emoji: '🙌',
       mode: 'dates', dates: new Set(),
       startTime: '09:00', endTime: '17:00', slotMinutes: 60,
       month: new Date(now.getFullYear(), now.getMonth(), 1),
@@ -466,7 +466,7 @@
         const rows = S.timeRows({ mode: 'times', startTime: draft.startTime, endTime: draft.endTime, slotMinutes: draft.slotMinutes }).length;
         txt += rows ? ` × ${rows} time slots = ${slotCount()} options` : ' · (pick an end time after the start time)';
       }
-      dateSummary.textContent = txt + (n > 1 ? ' 💅' : '');
+      dateSummary.textContent = txt + (n > 1 ? ' 👌' : '');
     }
 
     const descInput = h('textarea', {
@@ -490,7 +490,7 @@
         if (!draft.dates.size) { errorEl.textContent = 'Pick at least one date 📅'; calWrap.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
         if (draft.mode === 'times' && S.timeToMin(draft.endTime) <= S.timeToMin(draft.startTime)) { errorEl.textContent = 'End time needs to be after the start time ⏰'; return shake(endSel); }
         submit.disabled = true;
-        submit.textContent = 'Lighting candles… 🕯️';
+        submit.textContent = 'Rallying the troops… 📣';
         try {
           if (draft.host.trim()) store.set('mc-name', draft.host.trim());
           const { meetcute, adminKey } = await api('POST', '/api/meetcutes', {
@@ -530,12 +530,12 @@
 
     app.replaceChildren(
       h('section', { class: 'hero' },
-        h('h1', null, 'Let’s find a time ', h('span', { class: 'wiggle' }, '💘')),
+        h('h1', null, 'Let’s get the crew together ', h('span', { class: 'wiggle' }, '🙌')),
         h('p', { class: 'tagline' }, pick(TAGLINES)),
         h('ol', { class: 'how' },
           h('li', null, h('span', null, '✍️'), 'Pick some options'),
-          h('li', null, h('span', null, '💌'), 'Share the link'),
-          h('li', null, h('span', null, '💞'), 'Find your match'))),
+          h('li', null, h('span', null, '📲'), 'Share with friends'),
+          h('li', null, h('span', null, '🙌'), 'Find the best time'))),
       form);
     titleInput.focus({ preventScroll: true });
   }
@@ -552,14 +552,14 @@
       store.set('mc-admin-' + id, params.get('admin'));
       history.replaceState(null, '', '/m/' + id);
     }
-    app.replaceChildren(h('div', { class: 'loading' }, h('span', { class: 'beat' }, '💗'), 'Fluffing the pillows…'));
+    app.replaceChildren(h('div', { class: 'loading' }, h('span', { class: 'beat' }, '🎈'), 'Gathering the gang…'));
 
     let mc;
     try {
       ({ meetcute: mc } = await api('GET', '/api/meetcutes/' + encodeURIComponent(id)));
     } catch (err) {
       app.replaceChildren(h('section', { class: 'card empty-state' },
-        h('div', { class: 'big-emoji' }, '💔'), h('h1', null, 'Hmm, no MeetCute here'), h('p', null, err.message),
+        h('div', { class: 'big-emoji' }, '🤷'), h('h1', null, 'Hmm, no MeetCute here'), h('p', null, err.message),
         h('a', { class: 'btn primary', href: '/', 'data-link': true }, 'Start a new one')));
       return;
     }
@@ -596,7 +596,7 @@
           mc.description ? h('p', { class: 'desc' }, mc.description) : null,
           tzNote),
         h('div', { class: 'mc-actions' },
-          h('button', { class: 'btn small', type: 'button', onclick: () => shareMe() }, '💌 Invite people')));
+          h('button', { class: 'btn small', type: 'button', onclick: () => shareMe() }, '📣 Invite friends')));
     }
 
     async function shareMe() {
@@ -609,7 +609,7 @@
     }
 
     function inviteText() {
-      return `${mc.emoji} You’re invited: ${mc.title}! ${mc.host ? mc.host + ' wants' : 'We want'} to know when you’re free. Pick your times here 💌`;
+      return `${mc.emoji} You’re invited: ${mc.title}! ${mc.host ? mc.host + ' wants' : 'We want'} to know when you’re free. Pick your times here 👇`;
     }
 
     function renderShare(open) {
@@ -618,10 +618,10 @@
       const linkInput = h('input', { class: 'input mono', readonly: true, value: shareUrl, onfocus: (e) => e.target.select(), 'aria-label': 'Share link' });
       sharePanel.replaceChildren(h('section', { class: 'card share-card' + (fresh ? ' fresh' : '') },
         h('button', { class: 'close', type: 'button', 'aria-label': 'Close', onclick: () => renderShare(false) }, '×'),
-        h('h2', null, fresh ? 'Your MeetCute is ready! 🎉' : 'Spread the love 💌'),
+        h('h2', null, fresh ? 'Your MeetCute is ready! 🎉' : 'Rally the crew 📣'),
         h('p', null, 'Send this link to the group. Anyone with it can add their availability.'),
         h('div', { class: 'copy-row' }, linkInput,
-          h('button', { class: 'btn primary', type: 'button', onclick: (e) => { copy(shareUrl, 'Link copied! Go get ’em 💌'); burstFrom(e.currentTarget, { count: 14 }); } }, 'Copy link')),
+          h('button', { class: 'btn primary', type: 'button', onclick: (e) => { copy(shareUrl, 'Link copied! Go round up the gang 📣'); burstFrom(e.currentTarget, { count: 14 }); } }, 'Copy link')),
         h('div', { class: 'chips' },
           navigator.share ? h('button', { class: 'chip', type: 'button', onclick: shareMe }, '📤 Share…') : null,
           h('button', { class: 'chip', type: 'button', onclick: () => copy(`${inviteText()}\n${shareUrl}`, 'Invite copied! Paste it in the group chat 💬') }, '💬 Copy invite message'),
@@ -640,9 +640,9 @@
       const w = lockedWindow(mc);
       if (!w) { lockBanner.replaceChildren(); return; }
       lockBanner.replaceChildren(h('section', { class: 'card locked-banner' },
-        h('div', { class: 'ring', 'aria-hidden': 'true' }, '💍'),
+        h('div', { class: 'ring', 'aria-hidden': 'true' }, '📌'),
         h('div', null,
-          h('p', { class: 'eyebrow' }, 'It’s a date!'),
+          h('p', { class: 'eyebrow' }, 'It’s a plan!'),
           h('h2', null, fmtWindow(mc, w)),
           h('div', { class: 'chips' },
             h('a', { class: 'chip', href: googleCalUrl(mc, w), target: '_blank', rel: 'noopener' }, '📆 Add to Google Calendar'),
@@ -656,10 +656,10 @@
         renderLock();
         renderResults();
         if (slots) {
-          confetti({ count: 90, chars: ['💍', '💖', '🎉', '✨', '🥂'] });
-          toast('It’s official! 💍 Now tell the group.');
+          confetti({ count: 90, chars: ['🎉', '🥳', '🎊', '✨', '📌'] });
+          toast('It’s official! 📌 Now tell the group.');
           lockBanner.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        } else toast('Unlocked. Back on the market 😉');
+        } else toast('Unlocked. Back to the drawing board ✏️');
       } catch (err) { toast(err.message); }
     }
 
@@ -672,12 +672,12 @@
     });
     const greet = h('p', { class: 'greet', 'aria-live': 'polite' });
     const noteInput = h('input', {
-      class: 'input', maxlength: 140, placeholder: 'Leave a little note (optional) 💌',
+      class: 'input', maxlength: 140, placeholder: 'Leave a note for the group (optional) ✏️',
       oninput: (e) => { mine.note = e.target.value; dirty = true; },
     });
     const myGridHost = h('div', { class: 'grid-host' });
     const myCount = h('span', { class: 'count-pill' });
-    const saveBtn = h('button', { class: 'btn primary big', type: 'button', onclick: () => save() }, 'Save my availability 💘');
+    const saveBtn = h('button', { class: 'btn primary big', type: 'button', onclick: () => save() }, 'Save my availability 🙌');
 
     function findResponse(name) {
       const key = name.trim().toLocaleLowerCase();
@@ -739,7 +739,7 @@
       updateCount();
     }
 
-    const brushBtns = [['yes', '💚', 'I’m free'], ['maybe', '💛', 'If needed'], ['no', '🤍', 'Erase']].map(([val, icon, label]) =>
+    const brushBtns = [['yes', '✅', 'I’m free'], ['maybe', '🤞', 'If needed'], ['no', '🧽', 'Erase']].map(([val, icon, label]) =>
       h('button', {
         type: 'button', class: `brush brush-${val}` + (brush === val ? ' on' : ''), role: 'radio', 'aria-checked': String(brush === val),
         dataset: { brush: val },
@@ -775,7 +775,7 @@
         const best = computeBest();
         if (best && best.perfect && before < 100) {
           confetti({ count: 120 });
-          toast(`It’s a match! Everyone’s free ${fmtWindow(mc, best.w)} 💞`);
+          toast(`Everyone’s free ${fmtWindow(mc, best.w)}! It’s happening 🎉`);
         } else {
           burstFrom(saveBtn);
           toast(pick(SAVE_LINES));
@@ -785,7 +785,7 @@
         toast(err.message);
       } finally {
         saveBtn.disabled = false;
-        saveBtn.textContent = 'Update my availability 💘';
+        saveBtn.textContent = 'Update my availability 🙌';
       }
     }
 
@@ -811,7 +811,7 @@
       if (!n) {
         resultsHost.replaceChildren(h('section', { class: 'card results' },
           h('h2', null, 'Group results'),
-          h('div', { class: 'empty-state' }, h('div', { class: 'big-emoji float' }, '💌'), h('p', null, pick(EMPTY_LINES)))));
+          h('div', { class: 'empty-state' }, h('div', { class: 'big-emoji float' }, '📬'), h('p', null, pick(EMPTY_LINES)))));
         return;
       }
 
@@ -826,9 +826,9 @@
           : null;
         detail.replaceChildren(
           h('p', { class: 'detail-title' }, fmtSlot(mc, slot)),
-          people(i.yes, 'yes', '💚 Free'),
-          people(i.maybe, 'maybe', '💛 If needed'),
-          people(i.no, 'no', '🤍 Can’t make it'));
+          people(i.yes, 'yes', '✅ Free'),
+          people(i.maybe, 'maybe', '🤞 If needed'),
+          people(i.no, 'no', '❌ Can’t make it'));
       }
 
       const grid = slotGrid(mc, {
@@ -858,22 +858,22 @@
       // Chemistry meter.
       const best = computeBest();
       const meter = best ? h('div', { class: 'meter' },
-        h('div', { class: 'meter-label' }, h('span', null, 'Group chemistry'), h('strong', null, `${best.pct}% · ${chemistryLabel(best.pct)}`)),
+        h('div', { class: 'meter-label' }, h('span', null, 'Squad sync'), h('strong', null, `${best.pct}% · ${chemistryLabel(best.pct)}`)),
         h('div', { class: 'meter-bar', role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-valuenow': best.pct },
           (() => { const f = h('div', { class: 'meter-fill' }); f.style.setProperty('--pct', best.pct + '%'); return f; })())) : null;
 
-      // Top matches.
+      // Best times.
       const medals = ['🥇', '🥈', '🥉'];
       const matches = windows.slice(0, 3).map((w, idx) => {
         const perfect = n >= 2 && w.yes.length === n;
         return h('li', { class: 'match' + (perfect ? ' perfect' : '') },
-          h('span', { class: 'medal', 'aria-hidden': 'true' }, perfect ? '💞' : medals[idx]),
+          h('span', { class: 'medal', 'aria-hidden': 'true' }, perfect ? '🙌' : medals[idx]),
           h('div', { class: 'match-body' },
             h('strong', null, fmtWindow(mc, w)),
             h('span', { class: 'match-sub' },
-              perfect ? 'It’s a match! Everyone’s free 🎉' : `${w.yes.length} of ${n} free` + (w.maybe.length ? ` · ${w.maybe.length} if needed` : '') + (w.no.length ? ` · missing ${w.no.join(', ')}` : '')),
+              perfect ? 'Everyone’s free! 🎉' : `${w.yes.length} of ${n} free` + (w.maybe.length ? ` · ${w.maybe.length} if needed` : '') + (w.no.length ? ` · missing ${w.no.join(', ')}` : '')),
             h('span', { class: 'avatars' }, w.yes.map((nm) => avatar(nm, 'xs')))),
-          isAdmin ? h('button', { class: 'btn small', type: 'button', onclick: (e) => lockIn(w.slots, e.currentTarget) }, 'Lock it in 💍') : null);
+          isAdmin ? h('button', { class: 'btn small', type: 'button', onclick: (e) => lockIn(w.slots, e.currentTarget) }, 'Lock it in 📌') : null);
       });
 
       // People.
@@ -892,7 +892,7 @@
         isAdmin ? h('button', {
           type: 'button', class: 'remove', 'aria-label': `Remove ${r.name}`, title: 'Remove response',
           onclick: async () => {
-            if (!confirm(`Remove ${r.name}’s response? 💔`)) return;
+            if (!confirm(`Remove ${r.name}’s response?`)) return;
             try {
               ({ meetcute: mc } = await api('DELETE', `/api/meetcutes/${id}/responses/${r.id}`, null, { 'X-Admin-Key': adminKey }));
               if (focusPerson === r.name) focusPerson = null;
@@ -914,12 +914,12 @@
           h('h2', null, 'Group results'),
           h('span', { class: 'count-pill' }, `${n} ${n === 1 ? 'person' : 'people'} responded`)),
         meter,
-        matches.length ? h('div', null, h('h3', null, 'Top matches'), h('ol', { class: 'matches' }, matches)) : h('p', { class: 'hint' }, 'No overlap yet. Keep the faith 🤞'),
+        matches.length ? h('div', null, h('h3', null, 'Best times'), h('ol', { class: 'matches' }, matches)) : h('p', { class: 'hint' }, 'No overlap yet. Keep the faith 🤞'),
         h('h3', null, 'Who’s in'),
         h('ul', { class: 'people' }, people),
         h('div', { class: 'heat-legend' },
           h('span', null, 'Fewer'), h('span', { class: 'legend-bar' }), h('span', null, 'More'),
-          n >= 2 ? h('span', { class: 'legend-perfect' }, '💞 everyone') : null),
+          n >= 2 ? h('span', { class: 'legend-perfect' }, '🙌 everyone') : null),
         grid,
         detail));
     }
@@ -949,7 +949,7 @@
         resultsHost));
 
     if (nameInput.value) loadMine(false);
-    if (findResponse(nameInput.value)) saveBtn.textContent = 'Update my availability 💘';
+    if (findResponse(nameInput.value)) saveBtn.textContent = 'Update my availability 🙌';
 
     window.onbeforeunload = () => (dirty ? true : undefined);
 
@@ -965,7 +965,7 @@
         const lockChanged = JSON.stringify(fresh2.locked) !== JSON.stringify(mc.locked);
         mc = fresh2;
         renderResults();
-        if (lockChanged) { renderLock(); if (mc.locked) confetti({ count: 60, chars: ['💍', '💖', '🎉'] }); }
+        if (lockChanged) { renderLock(); if (mc.locked) confetti({ count: 60, chars: ['🎉', '🥳', '📌'] }); }
         if (newNames.length) toast(`${newNames.join(', ')} just joined the party 🎉`);
       } catch { /* offline; try again later */ }
     }, 15000);
@@ -989,7 +989,7 @@
     const t = eventTimes(mc, w);
     const p = new URLSearchParams({
       action: 'TEMPLATE', text: `${mc.emoji} ${mc.title}`, dates: `${t.start}/${t.end}`,
-      details: `${mc.description ? mc.description + '\n\n' : ''}Planned with MeetCute 💘 ${location.origin}/m/${mc.id}`,
+      details: `${mc.description ? mc.description + '\n\n' : ''}Planned with MeetCute 🙌 ${location.origin}/m/${mc.id}`,
     });
     return 'https://calendar.google.com/calendar/render?' + p;
   }
@@ -1004,7 +1004,7 @@
       t.allDay ? `DTSTART;VALUE=DATE:${t.start}` : `DTSTART:${t.start}`,
       t.allDay ? `DTEND;VALUE=DATE:${t.end}` : `DTEND:${t.end}`,
       `SUMMARY:${esc(mc.emoji + ' ' + mc.title)}`,
-      `DESCRIPTION:${esc((mc.description ? mc.description + '\n\n' : '') + 'Planned with MeetCute 💘')}`,
+      `DESCRIPTION:${esc((mc.description ? mc.description + '\n\n' : '') + 'Planned with MeetCute 🙌')}`,
       `URL:${location.origin}/m/${mc.id}`,
       'END:VEVENT', 'END:VCALENDAR',
     ];

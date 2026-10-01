@@ -89,7 +89,7 @@ function validateMeetCute(body) {
   const title = cleanText(body.title, LIMITS.title, 'Name', { required: true });
   const description = cleanText(body.description, LIMITS.description, 'Description');
   const host = cleanText(body.host, LIMITS.host, 'Your name');
-  let emoji = cleanText(body.emoji, 16, 'Emoji') || '💘';
+  let emoji = cleanText(body.emoji, 16, 'Emoji') || '🙌';
 
   const mode = body.mode === 'times' ? 'times' : body.mode === 'dates' ? 'dates' : null;
   if (!mode) throw bad('Mode must be "dates" or "times"');
@@ -189,10 +189,10 @@ function createApp({ dataFile } = {}) {
 
   function renderIndex(res, mc) {
     // Fill in link-preview tags so shared links look nice in group chats.
-    const title = mc ? `${mc.emoji} ${mc.title} · MeetCute` : 'MeetCute 💘 Find the time everyone falls for';
+    const title = mc ? `${mc.emoji} ${mc.title} · MeetCute` : 'MeetCute 🙌 Get the crew together';
     const desc = mc
-      ? (mc.host ? `${mc.host} wants to know when you're free. ` : "When are you free? ") + 'Tap to pick your times 💌'
-      : 'Create a MeetCute, share the link, and find the time everyone falls for.';
+      ? (mc.host ? `${mc.host} wants to know when you're free. ` : "When are you free? ") + 'Tap to pick your times 👇'
+      : 'Create a MeetCute, share the link with friends, and find the time that works for everyone.';
     const html = template.replaceAll('{{TITLE}}', escapeHtml(title)).replaceAll('{{DESC}}', escapeHtml(desc));
     send(res, 200, html, { 'Content-Type': MIME['.html'] });
   }
@@ -229,7 +229,7 @@ function createApp({ dataFile } = {}) {
     }
 
     const mc = store.get(id);
-    if (!mc) throw new HttpError(404, "We couldn't find that MeetCute. Maybe it was a dream? 💭");
+    if (!mc) throw new HttpError(404, "We couldn't find that MeetCute. Maybe it got lost in the group chat? 🤷");
 
     if (!sub) {
       if (req.method !== 'GET') throw new HttpError(405, 'Method not allowed');
@@ -306,7 +306,7 @@ if (require.main === module) {
   const port = Number(process.env.PORT) || 3000;
   const dataFile = process.env.DATA_FILE || path.join(__dirname, 'data', 'meetcutes.json');
   const { server, store } = createApp({ dataFile });
-  server.listen(port, () => console.log(`💘 MeetCute is live at http://localhost:${port}`));
+  server.listen(port, () => console.log(`🙌 MeetCute is live at http://localhost:${port}`));
   const shutdown = () => { store.flush(); process.exit(0); };
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
