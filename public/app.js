@@ -949,6 +949,7 @@
         dirty = false;
         renderMyGrid();
         greet.replaceChildren(avatar(r.name, 'sm'), ` Welcome back, ${r.name}! Here’s what you picked last time.`);
+        saveBtn.textContent = 'Update availability';
       } else if (announce) {
         greet.replaceChildren(avatar(name, 'sm'), ` ${pick(['Hi', 'Hey', 'Hello'])}, ${name}. ${pick(['Mark the times that work for you below.', 'Tap or drag to mark when you’re free.'])}`);
       }
@@ -967,6 +968,38 @@
     function updateCount() {
       const total = S.slotIds(mc).length;
       myCount.textContent = `${mine.yes.size} yes · ${mine.maybe.size} maybe · ${total - mine.yes.size - mine.maybe.size} no`;
+      renderPicks();
+    }
+
+    // For times, a plain-language list of what you've picked, day by day, with
+    // back-to-back slots merged into ranges ("5pm–7pm").
+    const picksHost = h('div', { class: 'picks' });
+    function renderPicks() {
+      if (mc.mode !== 'times') return;
+      const rows = S.timeRows(mc);
+      const days = [];
+      for (const d of mc.dates) {
+        const ranges = [];
+        let cur = null;
+        for (const t of rows) {
+          const st = cellState(`${d}T${t}`);
+          if (st === 'no') { cur = null; continue; }
+          if (cur && cur.state === st) cur.end = t;
+          else { cur = { state: st, start: t, end: t }; ranges.push(cur); }
+        }
+        if (ranges.length) days.push({ d, ranges });
+      }
+      const endOf = (t) => S.minToTime(S.timeToMin(t) + mc.slotMinutes);
+      picksHost.replaceChildren(
+        h('h3', null, 'Your picks'),
+        days.length
+          ? h('ul', { class: 'pick-days' }, days.map(({ d, ranges }) => h('li', { class: 'pick-day' },
+            h('span', { class: 'pick-date' }, fmtDate(d)),
+            h('span', { class: 'pick-ranges' }, ranges.map((rg) => h('span', {
+              class: 'pick ' + rg.state,
+              'aria-label': `${fmtTime(rg.start)} to ${fmtTime(endOf(rg.end))}, ${rg.state === 'yes' ? 'free' : 'if needed'}`,
+            }, icon(rg.state === 'yes' ? 'check' : 'maybe'), `${fmtTime(rg.start)}–${fmtTime(endOf(rg.end))}`))))))
+          : h('p', { class: 'hint' }, 'Nothing picked yet. Times you mark will be listed here by day.'));
     }
 
     function renderMyGrid() {
@@ -1207,6 +1240,7 @@
               h('button', { type: 'button', class: 'chip ghost', onclick: () => fillAll(null) }, 'Clear'))),
           h('p', { class: 'hint' }, mc.mode === 'times' ? 'Click or drag across the grid to paint your times.' : 'Tap or drag across the days that work for you.'),
           myGridHost,
+          mc.mode === 'times' ? picksHost : null,
           h('div', { class: 'save-row' }, noteInput, myCount, saveBtn)),
         resultsHost));
 

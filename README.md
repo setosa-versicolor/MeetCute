@@ -7,6 +7,8 @@
 2. **Share**: copy the link to your friends, send it by text or email, or use your phone's share sheet. Link previews show the MeetCute's name.
 3. **Respond**: each person types their name and click-drags (or taps) to mark *I'm free* or *If needed*.
    Typing the same name later brings back that person's picks so they can edit them.
+   For MeetCutes with times, a **Your picks** list under the grid spells out what you've marked for each day
+   ("Fri, Oct 23: 5pm–7pm free, 7pm–8pm if needed") and updates as you go.
    For dates-only MeetCutes, a **List | Calendar** switch shows the options either as cards or on a month
    calendar, with the other days faded for context. Each device remembers the choice.
 4. **Best times**: a live heatmap, a "group overlap" score, and the top 3 time windows. Back-to-back slots are

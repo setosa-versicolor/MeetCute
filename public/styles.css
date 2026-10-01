@@ -399,6 +399,24 @@ a.mc-card[href]:hover { border-color: var(--line-strong); }
   background: repeating-linear-gradient(135deg, var(--maybe) 0 6px, color-mix(in oklab, var(--maybe) 70%, var(--card)) 6px 10px);
 }
 
+/* your picks (times) */
+.picks { margin-top: 6px; }
+.picks h3 { margin-top: 18px; }
+.pick-days { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.pick-day { display: grid; grid-template-columns: 110px 1fr; gap: 10px; align-items: baseline; }
+.pick-date { font-weight: 600; font-size: .9rem; }
+.pick-ranges { display: flex; flex-wrap: wrap; gap: 6px; }
+.pick {
+  display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px 3px 8px; border-radius: 999px;
+  font-size: .85rem; font-weight: 600; font-variant-numeric: tabular-nums; border: 1px solid;
+}
+.pick .icon { width: 14px; height: 14px; stroke-width: 2.25; }
+.pick.yes { background: var(--yes-soft); border-color: var(--yes); color: var(--ink); }
+.pick.yes .icon { color: var(--yes); }
+.pick.maybe { background: var(--maybe-soft); border-color: var(--maybe); border-style: dashed; color: var(--ink); }
+.pick.maybe .icon { color: var(--maybe); }
+@media (max-width: 600px) { .pick-day { grid-template-columns: 1fr; gap: 4px; } }
+
 /* heatmap */
 .cell.heat {
   background: color-mix(in oklab, var(--hot) calc(var(--heat) * 100%), var(--cell-empty));
