@@ -348,7 +348,40 @@
 
   // ---------- slot grid (shared by "your picks" and "results") ----------
 
-  function slotGrid(mc, { cell, label }) {
+  // Dates-only MeetCutes can be shown as a month calendar, with the days that
+  // aren't options faded out for context.
+  function monthCalendar(mc, { cell, label }) {
+    const options = new Set(mc.dates);
+    const today = todayYmd();
+    const months = [...new Set(mc.dates.map((d) => d.slice(0, 7)))];
+    return h('div', { class: 'date-grid month-view', role: 'group', 'aria-label': label },
+      months.map((ym) => {
+        const [y, m] = ym.split('-').map(Number);
+        const first = new Date(y, m - 1, 1);
+        const daysInMonth = new Date(y, m, 0).getDate();
+        const days = [];
+        for (let i = 0; i < 7; i++) {
+          days.push(h('div', { class: 'cal-dow', 'aria-hidden': 'true' }, new Date(2023, 0, 1 + i).toLocaleDateString(undefined, { weekday: 'narrow' })));
+        }
+        for (let i = 0; i < first.getDay(); i++) days.push(h('div', { 'aria-hidden': 'true' }));
+        for (let d = 1; d <= daysInMonth; d++) {
+          const s = ymd(new Date(y, m - 1, d));
+          if (options.has(s)) {
+            const c = cell(s, h('span', { class: 'dom' }, d));
+            if (s === today) c.classList.add('today');
+            days.push(c);
+          } else {
+            days.push(h('div', { class: 'day-off' + (s === today ? ' today' : ''), 'aria-hidden': 'true' }, d));
+          }
+        }
+        return h('section', { class: 'month' },
+          h('p', { class: 'month-title' }, first.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })),
+          h('div', { class: 'month-days' }, days));
+      }));
+  }
+
+  function slotGrid(mc, { cell, label, view }) {
+    if (mc.mode !== 'times' && view === 'calendar') return monthCalendar(mc, { cell, label });
     if (mc.mode !== 'times') {
       return h('div', { class: 'date-grid', role: 'group', 'aria-label': label },
         mc.dates.map((d) => {
@@ -764,6 +797,35 @@
     if (isAdmin) myList.remember(mc, 'host');
     else if (known) myList.remember(mc, known.role);
 
+    // --- list / calendar view for dates-only MeetCutes (remembered on this device) ---
+    let dateView = store.get('mc-date-view') === 'calendar' ? 'calendar' : 'list';
+    const viewToggles = [];
+    function viewToggle() {
+      if (mc.mode === 'times') return null;
+      const btns = [['list', 'list', 'List'], ['calendar', 'calendar', 'Calendar']].map(([val, iconName, label]) =>
+        h('button', {
+          type: 'button', class: 'view-btn' + (dateView === val ? ' on' : ''), dataset: { view: val },
+          'aria-pressed': String(dateView === val), title: `${label} view`,
+          onclick: () => {
+            if (dateView === val) return;
+            dateView = val;
+            store.set('mc-date-view', val);
+            for (const group of viewToggles) {
+              group.querySelectorAll('.view-btn').forEach((b) => {
+                const on = b.dataset.view === val;
+                b.classList.toggle('on', on);
+                b.setAttribute('aria-pressed', String(on));
+              });
+            }
+            renderMyGrid();
+            renderResults();
+          },
+        }, icon(iconName), h('span', null, label)));
+      const group = h('div', { class: 'view-toggle', role: 'group', 'aria-label': 'Show dates as' }, btns);
+      viewToggles.push(group);
+      return group;
+    }
+
     // --- "mine" state ---
     const mine = { yes: new Set(), maybe: new Set(), note: '' };
     let brush = 'yes';
@@ -909,7 +971,7 @@
 
     function renderMyGrid() {
       const grid = slotGrid(mc, {
-        label: 'Your availability',
+        label: 'Your availability', view: dateView,
         cell: (slot, inner) => {
           const c = h('div', { class: 'cell mine', dataset: { slot }, tabindex: 0, role: 'button' }, inner);
           applyCell(c);
@@ -984,6 +1046,7 @@
 
     // --- results ---
     const resultsHost = h('div');
+    let resultsToggle = null;
     let focusPerson = null;
     let detailSlot = null;
 
@@ -1026,7 +1089,7 @@
       }
 
       const grid = slotGrid(mc, {
-        label: 'Group availability heatmap',
+        label: 'Group availability heatmap', view: dateView,
         cell: (slot, inner) => {
           const i = info.get(slot);
           const heat = n ? i.score / n : 0;
@@ -1039,6 +1102,7 @@
             ? h('span', { class: 'cell-count' }, perfect ? icon('check') : i.yes.length ? i.yes.length : '')
             : h('span', { class: 'cell-count' }, perfect ? icon('check') : null, `${i.yes.length}/${n}`));
           c.style.setProperty('--heat', heat.toFixed(3));
+          if (heat >= 0.5) c.classList.add('strong');
           if (focusPerson) {
             const r = mc.responses.find((x) => x.name === focusPerson);
             c.classList.toggle('dim', !(r && (r.yes.includes(slot) || r.maybe.includes(slot))));
@@ -1104,10 +1168,13 @@
         });
       }
 
+      if (resultsToggle) viewToggles.splice(viewToggles.indexOf(resultsToggle), 1);
+      resultsToggle = viewToggle();
       resultsHost.replaceChildren(h('section', { class: 'card results' },
         h('div', { class: 'results-head' },
           h('h2', null, 'Group results'),
           h('span', { class: 'count-pill' }, `${n} ${n === 1 ? 'person' : 'people'} responded`)),
+        resultsToggle ? h('div', { class: 'results-view' }, resultsToggle) : null,
         meter,
         matches.length ? h('div', null, h('h3', null, 'Best times'), h('ol', { class: 'matches' }, matches)) : h('p', { class: 'hint' }, 'No overlap yet.'),
         h('h3', null, 'Who’s in'),
@@ -1130,7 +1197,7 @@
       header, sharePanel, lockBanner,
       h('div', { class: 'two-col' },
         h('section', { class: 'card respond' },
-          h('h2', null, 'Your availability'),
+          h('div', { class: 'respond-head' }, h('h2', null, 'Your availability'), viewToggle()),
           h('label', { class: 'field' }, h('span', null, 'Who’s this?'), nameInput),
           greet,
           h('div', { class: 'brush-row' },

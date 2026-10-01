@@ -347,6 +347,36 @@ a.mc-card[href]:hover { border-color: var(--line-strong); }
 .cell { cursor: pointer; touch-action: none; transition: background-color .1s, opacity .2s; }
 .cell:focus-visible { outline-offset: -2px; z-index: 2; }
 
+/* month calendar view (dates-only MeetCutes) */
+.date-grid.month-view { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 340px)); gap: 20px 32px; align-items: start; }
+.month-title { font-family: var(--font-display); font-weight: 600; font-size: 1.02rem; margin: 0 0 8px; }
+.month-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.month-days .cal-dow { padding-bottom: 2px; }
+.month-view .cell, .day-off {
+  aspect-ratio: 1; min-width: 0; padding: 0; border-radius: 8px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.1;
+}
+.month-view .cell .dom { font-family: var(--font-body); font-size: .95rem; font-weight: 700; }
+.month-view .cell .cell-count { font-size: .62rem; font-weight: 600; opacity: .85; }
+.month-view .cell .cell-count .icon { width: 10px; height: 10px; }
+.day-off { color: var(--muted); opacity: .4; font-size: .88rem; font-variant-numeric: tabular-nums; }
+.month-view .today { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
+/* Days are too small for a badge; "if needed" gets a dashed edge so it isn't told apart by color alone. */
+.date-grid.month-view .cell.mine.yes::after, .date-grid.month-view .cell.mine.maybe::after { content: none; }
+.date-grid.month-view .cell.mine.maybe { border: 2px dashed var(--maybe); box-shadow: none; }
+
+.respond-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.respond-head h2 { margin: 0; }
+.results-view { margin-top: 14px; }
+.view-toggle { display: inline-flex; background: var(--bg); padding: 3px; border-radius: var(--radius-sm); border: 1px solid var(--line); }
+.view-btn {
+  font: inherit; font-size: .84rem; font-weight: 600; border: 0; background: transparent; color: var(--muted); cursor: pointer;
+  padding: 5px 10px; border-radius: 8px; display: inline-flex; gap: 6px; align-items: center; transition: background-color .15s, color .15s;
+}
+.view-btn .icon { width: 16px; height: 16px; }
+.view-btn:hover { color: var(--ink); }
+.view-btn.on { background: var(--card); color: var(--ink); box-shadow: var(--shadow); }
+
 /* your availability */
 .date-grid .cell.mine:hover { border-color: var(--line-strong); }
 .date-grid .cell.mine.yes { background: var(--yes-soft); border-color: var(--yes); box-shadow: inset 0 0 0 1px var(--yes); }
@@ -374,7 +404,9 @@ a.mc-card[href]:hover { border-color: var(--line-strong); }
   background: color-mix(in oklab, var(--hot) calc(var(--heat) * 100%), var(--cell-empty));
   cursor: default;
 }
-.date-grid .cell.heat { border-color: transparent; color: color-mix(in oklab, var(--on-accent) calc(var(--heat) * 100%), var(--ink)); }
+/* Text flips from dark to light once a day is at least half full, so it stays readable. */
+.date-grid .cell.heat { border-color: transparent; color: var(--ink); }
+.date-grid .cell.heat.strong { color: var(--on-accent); }
 .date-grid .cell.heat .dow, .date-grid .cell.heat .mon { color: inherit; opacity: .75; }
 .cell-count { font-size: .72rem; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 2px; font-variant-numeric: tabular-nums; }
 .cell-count .icon { width: 12px; height: 12px; stroke-width: 3; }
