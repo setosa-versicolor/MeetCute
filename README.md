@@ -12,6 +12,10 @@
 5. **Lock it in**: the organizer picks the winner. Everyone sees an "It's a plan!" banner with
    Add to Google Calendar and .ics download buttons.
 
+The home page lists **Your MeetCutes**: the ones you're organizing and the ones you've joined (by saving your
+availability), with their dates, number of responses and any locked-in time. There are no accounts, so this list
+is kept in the browser on each device. On a device with none yet, the home page offers to create your first one.
+
 The organizer's browser remembers that they created the MeetCute. They also get a secret **organizer link**
 for using another device. With it they can lock or unlock the final time and remove responses.
 

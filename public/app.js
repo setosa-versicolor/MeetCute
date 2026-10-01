@@ -32,6 +32,39 @@
   const store = {
     get(k) { try { return localStorage.getItem(k); } catch { return null; } },
     set(k, v) { try { localStorage.setItem(k, v); } catch { /* private mode */ } },
+    remove(k) { try { localStorage.removeItem(k); } catch { /* private mode */ } },
+  };
+
+  // MeetCutes this device has organized or joined. There are no accounts, so this
+  // list lives only in this browser: [{ id, title, emoji, role, lastOpened }].
+  const myList = {
+    all() {
+      let list = [];
+      try { list = JSON.parse(store.get('mc-list') || '[]'); } catch { /* corrupted; start over */ }
+      if (!Array.isArray(list)) list = [];
+      // Organizer keys saved before this list existed still count.
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          const id = k && k.startsWith('mc-admin-') ? k.slice(9) : null;
+          if (id && !list.some((x) => x.id === id)) list.push({ id, title: '', emoji: 'users', role: 'host', lastOpened: '' });
+        }
+      } catch { /* storage unavailable */ }
+      return list.filter((x) => x && typeof x.id === 'string');
+    },
+    save(list) { store.set('mc-list', JSON.stringify(list.slice(0, 100))); },
+    remember(mc, role) {
+      const list = this.all().filter((x) => x.id !== mc.id);
+      const prev = this.all().find((x) => x.id === mc.id);
+      // Once you organize one, it stays "organizing" even if you also respond.
+      const finalRole = role === 'host' || (prev && prev.role === 'host') ? 'host' : role;
+      list.unshift({ id: mc.id, title: mc.title, emoji: mc.emoji, role: finalRole, lastOpened: new Date().toISOString() });
+      this.save(list);
+    },
+    forget(id) {
+      this.save(this.all().filter((x) => x.id !== id));
+      store.remove('mc-admin-' + id);
+    },
   };
 
   // ---------- backend ----------
@@ -353,7 +386,7 @@
   // =====================================================================
 
   function showCreate() {
-    document.title = 'MeetCute · Find a time that works for everyone';
+    document.title = 'New MeetCute · MeetCute';
     const now = new Date();
     const draft = {
       title: '', description: '', host: store.get('mc-name') || '', emoji: 'users',
@@ -550,6 +583,7 @@
           });
           store.set('mc-admin-' + meetcute.id, adminKey);
           store.set('mc-fresh-' + meetcute.id, '1');
+          myList.remember(meetcute, 'host');
           confetti({ count: 70 });
           navigate('?m=' + encodeURIComponent(meetcute.id));
         } catch (err) {
@@ -577,16 +611,123 @@
     renderCalendar();
     updateSummary();
 
-    app.replaceChildren(
+    const hasList = myList.all().length > 0;
+    app.replaceChildren(...[
+      hasList ? h('a', { class: 'back-link', href: './', 'data-link': true }, icon('chevron-left'), 'Your MeetCutes') : null,
       h('section', { class: 'hero' },
+        h('h1', null, 'New MeetCute'),
+        h('p', { class: 'tagline' }, 'Pick some options, then share the link with friends.')),
+      form,
+    ].filter(Boolean));
+    titleInput.focus({ preventScroll: true });
+  }
+
+  // =====================================================================
+  // HOME: your MeetCutes, or a welcome if this device has none yet
+  // =====================================================================
+
+  function showHome() {
+    document.title = 'MeetCute · Find a time that works for everyone';
+    const list = myList.all();
+
+    if (!list.length) {
+      app.replaceChildren(h('section', { class: 'welcome' },
         h('h1', null, 'Find a time that works for everyone.'),
         h('p', { class: 'tagline' }, pick(TAGLINES)),
-        h('ol', { class: 'how' },
-          h('li', null, icon('calendar'), 'Pick some options'),
-          h('li', null, icon('share'), 'Share with friends'),
-          h('li', null, icon('check-circle'), 'Find the best time'))),
-      form);
-    titleInput.focus({ preventScroll: true });
+        h('a', { class: 'btn primary big', href: '?new', 'data-link': true }, icon('plus'), 'Create your first MeetCute'),
+        h('ol', { class: 'how-cards' },
+          h('li', null, h('span', { class: 'how-icon' }, icon('calendar')), h('strong', null, 'Pick some options'),
+            h('span', null, 'Choose a few dates, and times if you like.')),
+          h('li', null, h('span', { class: 'how-icon' }, icon('share')), h('strong', null, 'Share the link'),
+            h('span', null, 'Friends add their availability. No sign-up needed.')),
+          h('li', null, h('span', { class: 'how-icon' }, icon('check-circle')), h('strong', null, 'Find the best time'),
+            h('span', null, 'See where everyone overlaps, then lock it in.'))),
+        h('p', { class: 'hint device-note' }, 'MeetCutes you create or join on this device will show up here.')));
+      return;
+    }
+
+    // Most recently opened first; sections for organizing vs. joined.
+    list.sort((a, b) => (b.lastOpened || '').localeCompare(a.lastOpened || ''));
+    const cards = new Map();
+    const section = (role, title) => {
+      const items = list.filter((x) => (role === 'host' ? x.role === 'host' : x.role !== 'host'));
+      if (!items.length) return null;
+      return h('section', { class: 'home-section' },
+        h('h3', null, title),
+        h('ul', { class: 'mc-cards' }, items.map((x) => {
+          const li = h('li', { class: 'mc-card-wrap' });
+          cards.set(x.id, { li, entry: x });
+          renderCard(li, x, null);
+          return li;
+        })));
+    };
+
+    app.replaceChildren(...[
+      h('div', { class: 'home-head' },
+        h('h1', null, 'Your MeetCutes'),
+        h('a', { class: 'btn primary', href: '?new', 'data-link': true }, icon('plus'), 'New MeetCute')),
+      section('host', 'Organizing'),
+      section('guest', 'Joined'),
+      h('p', { class: 'hint device-note' }, 'This list is saved on this device only. MeetCutes you open on another device won’t appear here.'),
+    ].filter(Boolean));
+
+    // Fill in live details (responses, lock-in) once each loads.
+    for (const [id, { li, entry }] of cards) {
+      backend.get(id).then(({ meetcute }) => {
+        if (meetcute.title !== entry.title || meetcute.emoji !== entry.emoji) {
+          const all = myList.all();
+          const e = all.find((x) => x.id === id);
+          if (e) { e.title = meetcute.title; e.emoji = meetcute.emoji; myList.save(all); }
+        }
+        renderCard(li, entry, meetcute);
+      }, (err) => {
+        if (/couldn.t find/i.test(err.message)) renderCard(li, entry, 'missing');
+      });
+    }
+
+    function renderCard(li, entry, mc) {
+      const missing = mc === 'missing';
+      const live = mc && !missing ? mc : null;
+      const title = (live && live.title) || entry.title || 'Loading…';
+      const meta = [];
+      let status = null;
+      if (live) {
+        const first = live.dates[0], last = live.dates[live.dates.length - 1];
+        const range = first === last ? fmtDate(first, { month: 'short', day: 'numeric' })
+          : `${fmtDate(first, { month: 'short', day: 'numeric' })} – ${fmtDate(last, { month: 'short', day: 'numeric' })}`;
+        meta.push(range);
+        const n = live.responses.length;
+        meta.push(n ? `${n} ${n === 1 ? 'response' : 'responses'}` : 'No responses yet');
+        const lw = lockedWindow(live);
+        const past = last < todayYmd() && (!lw || lw.date < todayYmd());
+        if (lw) status = h('span', { class: 'status locked' }, icon('pin'), fmtWindow(live, lw));
+        else if (past) status = h('span', { class: 'status past' }, 'Past');
+        else status = h('span', { class: 'status open' }, 'Collecting responses');
+      } else if (missing) {
+        status = h('span', { class: 'status past' }, 'No longer available');
+      }
+      const remove = h('button', {
+        type: 'button', class: 'remove', 'aria-label': `Remove ${title} from this list`, title: 'Remove from this list',
+        onclick: (e) => {
+          e.preventDefault();
+          const msg = entry.role === 'host' && !missing
+            ? `Remove “${title}” from this device? The MeetCute isn’t deleted, but you’ll need your organizer link to manage it again.`
+            : `Remove “${title}” from this device? The MeetCute isn’t deleted.`;
+          if (!confirm(msg)) return;
+          myList.forget(entry.id);
+          toast('Removed from this device.');
+          showHome();
+        },
+      }, icon('x'));
+      li.replaceChildren(
+        h('a', { class: 'mc-card' + (missing ? ' missing' : ''), href: missing ? null : '?m=' + encodeURIComponent(entry.id), 'data-link': missing ? null : true },
+          h('span', { class: 'event-icon' }, icon(eventIcon((live && live.emoji) || entry.emoji))),
+          h('span', { class: 'mc-card-body' },
+            h('strong', { class: 'mc-card-title' }, title),
+            meta.length ? h('span', { class: 'mc-card-meta' }, meta.join(' · ')) : null,
+            status)),
+        remove);
+    }
   }
 
   // =====================================================================
@@ -609,7 +750,7 @@
     } catch (err) {
       app.replaceChildren(h('section', { class: 'card empty-state' },
         h('div', { class: 'empty-icon' }, icon('search-x')), h('h1', null, 'Hmm, no MeetCute here'), h('p', null, plain(err.message)),
-        h('a', { class: 'btn primary', href: './', 'data-link': true }, 'Start a new one')));
+        h('a', { class: 'btn primary', href: '?new', 'data-link': true }, 'Start a new one')));
       return;
     }
 
@@ -619,6 +760,9 @@
     if (fresh) { try { localStorage.removeItem('mc-fresh-' + id); } catch { /* ignore */ } }
     const shareUrl = meetcuteUrl(id);
     document.title = `${mc.title} · MeetCute`;
+    const known = myList.all().find((x) => x.id === id);
+    if (isAdmin) myList.remember(mc, 'host');
+    else if (known) myList.remember(mc, known.role);
 
     // --- "mine" state ---
     const mine = { yes: new Set(), maybe: new Set(), note: '' };
@@ -818,6 +962,7 @@
           name, yes: [...mine.yes], maybe: [...mine.maybe], note: mine.note,
         }));
         store.set('mc-name', name);
+        myList.remember(mc, isAdmin ? 'host' : 'guest');
         loadedName = name;
         dirty = false;
         renderResults();
@@ -1082,7 +1227,11 @@
     window.onbeforeunload = null;
     window.scrollTo(0, 0);
     const id = currentId();
-    if (id) showMeetCute(id); else showCreate();
+    const view = id ? 'meetcute' : new URLSearchParams(location.search).has('new') ? 'create' : 'home';
+    document.body.dataset.view = view;
+    if (view === 'meetcute') showMeetCute(id);
+    else if (view === 'create') showCreate();
+    else showHome();
   }
 
   document.addEventListener('click', (e) => {
