@@ -81,6 +81,23 @@ test('rejects bad MeetCutes', async () => {
   assert.equal(datesOnly.json.meetcute.startTime, undefined);
 });
 
+test('different hours per day', async () => {
+  const dayTimes = { '2026-10-04': { startTime: '10:00', endTime: '12:00' } };
+  const { status, json } = await newMc({ dayTimes });
+  assert.equal(status, 201);
+  assert.deepEqual(json.meetcute.dayTimes, dayTimes);
+  const id = json.meetcute.id;
+  const ok = await call('PUT', `/api/meetcutes/${id}/responses`, { name: 'A', yes: ['2026-10-04T10:30', '2026-10-03T18:00'] });
+  assert.equal(ok.status, 200);
+  const outside = await call('PUT', `/api/meetcutes/${id}/responses`, { name: 'B', yes: ['2026-10-04T18:00'] });
+  assert.equal(outside.status, 400, 'usual hours do not apply to a day with its own hours');
+  assert.equal((await newMc({ dayTimes: { '2026-12-25': { startTime: '10:00', endTime: '12:00' } } })).status, 400);
+  assert.equal((await newMc({ dayTimes: { '2026-10-04': { startTime: '12:00', endTime: '10:00' } } })).status, 400);
+  assert.equal((await newMc({ dayTimes: { '2026-10-04': { startTime: '10:15', endTime: '12:00' } } })).status, 400);
+  assert.equal((await newMc({ dayTimes: [] })).status, 400);
+  assert.equal((await newMc({ mode: 'dates', dayTimes })).json.meetcute.dayTimes, undefined, 'ignored for dates-only');
+});
+
 test('unknown MeetCute is a friendly 404', async () => {
   const r = await call('GET', '/api/meetcutes/doesnotexist');
   assert.equal(r.status, 404);

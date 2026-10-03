@@ -41,3 +41,18 @@ test('converts wall time in a zone to UTC, across DST', () => {
   assert.equal(S.zonedToUtc('2026-12-01', '09:00', 'America/New_York').toISOString(), '2026-12-01T14:00:00.000Z');
   assert.equal(S.zonedToUtc('2026-10-01', '24:00', 'UTC').toISOString(), '2026-10-02T00:00:00.000Z');
 });
+
+test('days can have their own hours', () => {
+  const mc = {
+    mode: 'times', dates: ['2026-10-23', '2026-10-24', '2026-10-25'], startTime: '17:00', endTime: '19:00', slotMinutes: 60,
+    dayTimes: { '2026-10-24': { startTime: '10:00', endTime: '12:00' } },
+  };
+  assert.deepEqual(S.dayRows(mc, '2026-10-23'), ['17:00', '18:00']);
+  assert.deepEqual(S.dayRows(mc, '2026-10-24'), ['10:00', '11:00']);
+  assert.deepEqual(S.timeRows(mc), ['10:00', '11:00', '17:00', '18:00'], 'grid rows are every hour any day uses');
+  assert.deepEqual(S.slotIds(mc), ['2026-10-23T17:00', '2026-10-23T18:00', '2026-10-24T10:00', '2026-10-24T11:00', '2026-10-25T17:00', '2026-10-25T18:00']);
+  mc.responses = [{ name: 'Ana', yes: ['2026-10-24T10:00', '2026-10-24T11:00'], maybe: [] }];
+  const [w] = S.computeWindows(mc);
+  assert.equal(w.start, '10:00');
+  assert.equal(w.end, '12:00');
+});

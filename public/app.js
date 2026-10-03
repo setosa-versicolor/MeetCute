@@ -393,21 +393,30 @@
         }));
     }
     const rows = S.timeRows(mc);
+    const perDay = !!mc.dayTimes;
+    const dayRowSets = new Map(mc.dates.map((d) => [d, new Set(S.dayRows(mc, d))]));
     const grid = h('div', { class: 'time-grid', role: 'group', 'aria-label': label });
     grid.style.setProperty('--cols', mc.dates.length);
     grid.append(h('div', { class: 'corner' }));
     for (const d of mc.dates) {
       const dt = parseYmd(d);
+      const w = S.dayWindow(mc, d);
       grid.append(h('div', { class: 'col-head' },
         h('span', { class: 'dow' }, dt.toLocaleDateString(undefined, { weekday: 'short' })),
-        h('span', { class: 'dom' }, dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }))));
+        h('span', { class: 'dom' }, dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })),
+        perDay ? h('span', { class: 'col-hours' }, `${fmtTime(w.startTime)}–${fmtTime(w.endTime)}`) : null));
     }
-    rows.forEach((t) => {
-      const onHour = t.endsWith(':00') || mc.slotMinutes === 60;
-      grid.append(h('div', { class: 'row-head' + (onHour ? ' hour' : '') }, onHour ? fmtTime(t) : ''));
+    rows.forEach((t, i) => {
+      // A break in the hours (e.g. mornings on one day, evenings on another).
+      const gap = i > 0 && S.timeToMin(rows[i - 1]) + mc.slotMinutes !== S.timeToMin(t);
+      const onHour = gap || t.endsWith(':00') || mc.slotMinutes === 60;
+      const extra = (onHour ? ' hour' : '') + (gap ? ' gap' : '');
+      grid.append(h('div', { class: 'row-head' + extra }, onHour ? fmtTime(t) : ''));
       for (const d of mc.dates) {
-        const c = cell(`${d}T${t}`, null);
-        if (onHour) c.classList.add('hour');
+        const c = dayRowSets.get(d).has(t)
+          ? cell(`${d}T${t}`, null)
+          : h('div', { class: 'cell off', 'aria-hidden': 'true', title: 'Not an option on this day' });
+        if (extra) c.className += extra;
         grid.append(c);
       }
     });
@@ -425,8 +434,23 @@
       title: '', description: '', host: store.get('mc-name') || '', emoji: 'users',
       mode: 'dates', dates: new Set(),
       startTime: '09:00', endTime: '17:00', slotMinutes: 60,
+      perDay: false, dayTimes: {}, // dayTimes: only the days changed from the usual hours
       month: new Date(now.getFullYear(), now.getMonth(), 1),
     };
+    const dayWindow = (d) => draft.dayTimes[d] || { startTime: draft.startTime, endTime: draft.endTime };
+    // The MeetCute as it would be created, for counting options and building the request.
+    function draftTimes() {
+      const out = { mode: 'times', dates: [...draft.dates].sort(), startTime: draft.startTime, endTime: draft.endTime, slotMinutes: draft.slotMinutes };
+      if (draft.perDay) {
+        const changed = {};
+        for (const d of out.dates) {
+          const w = draft.dayTimes[d];
+          if (w && (w.startTime !== draft.startTime || w.endTime !== draft.endTime)) changed[d] = { ...w };
+        }
+        if (Object.keys(changed).length) out.dayTimes = changed;
+      }
+      return out;
+    }
 
     // --- name + icon ---
     const titleInput = h('input', {
@@ -544,7 +568,48 @@
       [15, 30, 60].map((n) => h('option', { value: n, selected: n === draft.slotMinutes }, n === 60 ? '1 hour' : `${n} min`)));
 
     const setRange = (a, b) => { draft.startTime = startSel.value = a; draft.endTime = endSel.value = b; updateSummary(); };
+
+    // Same hours every day (default), or different hours for some days.
+    const usualLabel = h('p', { class: 'subhead', hidden: true }, 'Usual hours');
+    const dayList = h('div', { class: 'day-times', hidden: true });
+    const perDayBtns = [[false, 'Same times every day'], [true, 'Different times per day']].map(([val, label]) =>
+      h('button', {
+        type: 'button', class: 'view-btn' + (draft.perDay === val ? ' on' : ''), 'aria-pressed': String(draft.perDay === val),
+        dataset: { perday: String(val) },
+        onclick: () => {
+          draft.perDay = val;
+          perDayBtns.forEach((b) => { const on = b.dataset.perday === String(val); b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
+          updateSummary();
+        },
+      }, label));
+
+    function renderDayList() {
+      usualLabel.hidden = dayList.hidden = !draft.perDay;
+      if (!draft.perDay) return;
+      const dates = [...draft.dates].sort();
+      if (!dates.length) { dayList.replaceChildren(h('p', { class: 'hint' }, 'Pick some dates above, then set the hours for each one here.')); return; }
+      dayList.replaceChildren(
+        h('p', { class: 'hint' }, 'Days you don’t change use the usual hours.'),
+        h('ul', { class: 'day-time-rows' }, dates.map((d) => {
+          const w = dayWindow(d);
+          const changed = !!draft.dayTimes[d] && (draft.dayTimes[d].startTime !== draft.startTime || draft.dayTimes[d].endTime !== draft.endTime);
+          const set = (key) => (e) => {
+            draft.dayTimes[d] = { ...dayWindow(d), [key]: e.target.value };
+            updateSummary();
+          };
+          return h('li', { class: 'day-time-row' + (changed ? ' changed' : ''), dataset: { date: d } },
+            h('span', { class: 'day-time-date' }, fmtDate(d)),
+            h('select', { class: 'input', 'aria-label': `${fmtDate(d)} from`, onchange: set('startTime') }, timeOptions(w.startTime, false)),
+            h('span', { class: 'day-time-to', 'aria-hidden': 'true' }, 'to'),
+            h('select', { class: 'input', 'aria-label': `${fmtDate(d)} to`, onchange: set('endTime') }, timeOptions(w.endTime, true)),
+            changed
+              ? h('button', { type: 'button', class: 'link-btn', onclick: () => { delete draft.dayTimes[d]; updateSummary(); } }, 'Reset')
+              : h('span', { class: 'day-time-note' }, 'Usual'));
+        })));
+    }
+
     const timePanel = h('div', { class: 'time-panel', hidden: true },
+      usualLabel,
       h('div', { class: 'chips' },
         h('button', { type: 'button', class: 'chip', onclick: () => setRange('08:00', '12:00') }, icon('sunrise'), 'Morning'),
         h('button', { type: 'button', class: 'chip', onclick: () => setRange('12:00', '17:00') }, icon('sun'), 'Afternoon'),
@@ -554,6 +619,8 @@
         h('label', null, 'From', startSel),
         h('label', null, 'To', endSel),
         h('label', null, 'Slots of', slotSel)),
+      h('div', { class: 'view-toggle per-day-toggle', role: 'group', 'aria-label': 'Hours for each day' }, perDayBtns),
+      dayList,
       h('p', { class: 'hint' }, `Times are in your time zone (${myTimeZone}).`));
 
     const modeBtns = [['dates', 'calendar', 'Dates only', 'Just figure out which day'], ['times', 'clock', 'Dates & times', 'Pin down the hour too']]
@@ -568,18 +635,25 @@
         },
       }, h('span', { class: 'mode-icon' }, icon(iconName)), h('strong', null, label), h('small', null, sub)));
 
-    function slotCount() {
-      if (draft.mode !== 'times') return draft.dates.size;
-      return draft.dates.size * S.timeRows({ mode: 'times', startTime: draft.startTime, endTime: draft.endTime, slotMinutes: draft.slotMinutes }).length;
+    // Days whose hours end before they start (or leave no full slot).
+    function badDays() {
+      const dates = [...draft.dates].sort();
+      return dates.filter((d) => {
+        const w = draft.perDay ? dayWindow(d) : { startTime: draft.startTime, endTime: draft.endTime };
+        return S.timeToMin(w.endTime) - S.timeToMin(w.startTime) < draft.slotMinutes;
+      });
     }
 
     function updateSummary() {
+      renderDayList();
       const n = draft.dates.size;
       if (!n) { dateSummary.textContent = 'Tap or drag across days to pick them.'; return; }
       let txt = `${n} ${n === 1 ? 'date' : 'dates'} picked`;
       if (draft.mode === 'times') {
-        const rows = S.timeRows({ mode: 'times', startTime: draft.startTime, endTime: draft.endTime, slotMinutes: draft.slotMinutes }).length;
-        txt += rows ? ` × ${rows} time slots = ${slotCount()} options` : ' · (pick an end time after the start time)';
+        const mc = draftTimes();
+        if (badDays().length) txt += ' · (pick an end time after the start time)';
+        else if (mc.dayTimes) txt += ` · ${S.slotIds(mc).length} time slots in total`;
+        else txt += ` × ${S.timeRows(mc).length} time slots = ${S.slotIds(mc).length} options`;
       }
       dateSummary.textContent = txt;
     }
@@ -604,6 +678,13 @@
         if (!draft.title.trim()) { errorEl.textContent = 'Give your MeetCute a name.'; return shake(titleInput); }
         if (!draft.dates.size) { errorEl.textContent = 'Pick at least one date.'; calWrap.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
         if (draft.mode === 'times' && S.timeToMin(draft.endTime) <= S.timeToMin(draft.startTime)) { errorEl.textContent = 'End time needs to be after the start time.'; return shake(endSel); }
+        if (draft.mode === 'times' && badDays().length) {
+          const d = badDays()[0];
+          errorEl.textContent = `On ${fmtDate(d)}, the end time needs to be after the start time.`;
+          const row = dayList.querySelector(`[data-date="${d}"] select:last-of-type`);
+          return row ? shake(row) : shake(endSel);
+        }
+        const times = draft.mode === 'times' ? draftTimes() : null;
         submit.disabled = true;
         submit.textContent = 'Creating…';
         try {
@@ -612,8 +693,12 @@
             title: draft.title, description: draft.description, host: draft.host, emoji: draft.emoji,
             mode: draft.mode, dates: [...draft.dates].sort(),
             startTime: draft.startTime, endTime: draft.endTime, slotMinutes: draft.slotMinutes,
-            timezone: myTimeZone,
+            dayTimes: times && times.dayTimes, timezone: myTimeZone,
           });
+          if (times && times.dayTimes && !meetcute.dayTimes) {
+            // The Supabase database predates per-day hours and silently ignored them.
+            throw new Error('Different times per day needs a quick database update. Re-run supabase/schema.sql in your Supabase SQL Editor (see the README), then try again.');
+          }
           store.set('mc-admin-' + meetcute.id, adminKey);
           store.set('mc-fresh-' + meetcute.id, '1');
           myList.remember(meetcute, 'host');
@@ -976,15 +1061,14 @@
     const picksHost = h('div', { class: 'picks' });
     function renderPicks() {
       if (mc.mode !== 'times') return;
-      const rows = S.timeRows(mc);
       const days = [];
       for (const d of mc.dates) {
         const ranges = [];
         let cur = null;
-        for (const t of rows) {
+        for (const t of S.dayRows(mc, d)) {
           const st = cellState(`${d}T${t}`);
           if (st === 'no') { cur = null; continue; }
-          if (cur && cur.state === st) cur.end = t;
+          if (cur && cur.state === st && S.timeToMin(cur.end) + mc.slotMinutes === S.timeToMin(t)) cur.end = t;
           else { cur = { state: st, start: t, end: t }; ranges.push(cur); }
         }
         if (ranges.length) days.push({ d, ranges });

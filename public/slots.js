@@ -28,21 +28,41 @@
     return String(Math.floor(n / 60)).padStart(2, '0') + ':' + String(n % 60).padStart(2, '0');
   }
 
-  // Start times of each row in a "times" MeetCute.
+  // The time window for one day: its own (mc.dayTimes) if the organizer set
+  // different times per day, otherwise the MeetCute's usual hours.
+  function dayWindow(mc, date) {
+    const own = mc.dayTimes && mc.dayTimes[date];
+    return own ? { startTime: own.startTime, endTime: own.endTime } : { startTime: mc.startTime, endTime: mc.endTime };
+  }
+
+  function rowsBetween(startTime, endTime, slotMinutes) {
+    const start = timeToMin(startTime), end = timeToMin(endTime);
+    const rows = [];
+    for (let t = start; t + slotMinutes <= end; t += slotMinutes) rows.push(minToTime(t));
+    return rows;
+  }
+
+  // Start times of the rows that exist on one day.
+  function dayRows(mc, date) {
+    if (mc.mode !== 'times') return [];
+    const w = dayWindow(mc, date);
+    return rowsBetween(w.startTime, w.endTime, mc.slotMinutes);
+  }
+
+  // Every row any day uses, in order (the rows of the time grid).
   function timeRows(mc) {
     if (mc.mode !== 'times') return [];
-    const start = timeToMin(mc.startTime), end = timeToMin(mc.endTime);
-    const rows = [];
-    for (let t = start; t + mc.slotMinutes <= end; t += mc.slotMinutes) rows.push(minToTime(t));
-    return rows;
+    if (!mc.dayTimes || !mc.dates) return rowsBetween(mc.startTime, mc.endTime, mc.slotMinutes);
+    const all = new Set();
+    for (const d of mc.dates) for (const t of dayRows(mc, d)) all.add(t);
+    return [...all].sort();
   }
 
   // Every selectable option. Dates mode: "2026-10-04". Times mode: "2026-10-04T14:30".
   function slotIds(mc) {
     if (mc.mode !== 'times') return mc.dates.slice();
-    const rows = timeRows(mc);
     const out = [];
-    for (const d of mc.dates) for (const r of rows) out.push(d + 'T' + r);
+    for (const d of mc.dates) for (const r of dayRows(mc, d)) out.push(d + 'T' + r);
     return out;
   }
 
@@ -71,7 +91,7 @@
   function computeWindows(mc) {
     const info = slotInfo(mc);
     const groups = mc.mode === 'times'
-      ? mc.dates.map((d) => timeRows(mc).map((t) => d + 'T' + t))
+      ? mc.dates.map((d) => dayRows(mc, d).map((t) => d + 'T' + t))
       : mc.dates.map((d) => [d]);
     const windows = [];
     for (const group of groups) {
@@ -125,5 +145,5 @@
     return new Date(t);
   }
 
-  return { isValidDate, timeToMin, minToTime, timeRows, slotIds, slotDate, slotTime, slotInfo, computeWindows, tzOffsetMs, zonedToUtc };
+  return { isValidDate, timeToMin, minToTime, dayWindow, dayRows, timeRows, slotIds, slotDate, slotTime, slotInfo, computeWindows, tzOffsetMs, zonedToUtc };
 });

@@ -54,7 +54,7 @@ const base = {
   startTime: '18:00', endTime: '21:00', slotMinutes: 30, timezone: 'America/Chicago',
 };
 
-test.after(() => { if (PG) { dropDb('main'); dropDb('clash'); } });
+test.after(() => { if (PG) { dropDb('main'); dropDb('clash'); dropDb('upgrade'); } });
 
 test('applies next to an existing app without touching it, and can be re-run', { skip }, () => {
   pgArgs = freshDb('main');
@@ -126,6 +126,35 @@ test('valid options match the app’s own slot list', { skip }, () => {
     const mc = rpc('upsert_response', meetcute.id, { name: 'All', yes: all }).meetcute;
     assert.deepEqual(mc.responses[0].yes, all.slice().sort());
   }
+});
+
+test('different hours per day', { skip }, () => {
+  const dayTimes = { '2026-10-04': { startTime: '10:00', endTime: '12:00' } };
+  const { meetcute } = rpc('create_meetcute', { ...base, dayTimes });
+  assert.deepEqual(meetcute.dayTimes, dayTimes);
+  const all = S.slotIds(meetcute);
+  assert.ok(all.includes('2026-10-04T10:00') && !all.includes('2026-10-04T18:00'));
+  const mc = rpc('upsert_response', meetcute.id, { name: 'All', yes: all }).meetcute;
+  assert.deepEqual(mc.responses[0].yes, all.slice().sort(), 'database and app agree on every option');
+  assert.throws(() => rpc('upsert_response', meetcute.id, { name: 'B', yes: ['2026-10-04T18:00'] }), /not one of the options/);
+  assert.throws(() => rpc('create_meetcute', { ...base, dayTimes: { '2026-12-25': { startTime: '10:00', endTime: '12:00' } } }), /one of the picked dates/);
+  assert.throws(() => rpc('create_meetcute', { ...base, dayTimes: { '2026-10-04': { startTime: '12:00', endTime: '10:00' } } }), /after start/);
+  assert.throws(() => rpc('create_meetcute', { ...base, dayTimes: { '2026-10-04': { startTime: '10:15', endTime: '12:00' } } }), /line up/);
+  assert.throws(() => rpc('create_meetcute', { ...base, dayTimes: [] }), /must be an object/);
+  assert.equal(rpc('create_meetcute', base).meetcute.dayTimes, undefined);
+});
+
+test('upgrading a database set up with the previous script keeps its data', { skip }, () => {
+  const args = freshDb('upgrade');
+  // The script as it was before per-day hours, i.e. what an existing Supabase project already ran.
+  const old = require('node:fs').readFileSync(path.join(__dirname, 'fixtures', 'schema-before-day-times.sql'), 'utf8');
+  execFileSync('psql', [...args, '-X', '-q', '-v', 'ON_ERROR_STOP=1'], { input: old, stdio: ['pipe', 'pipe', 'pipe'] });
+  const before = JSON.parse(psql(`set role anon; select public.create_meetcute(${lit(base)}::jsonb);`, args));
+  applySchema(args);
+  const after = JSON.parse(psql(`set role anon; select public.get_meetcute(${lit(before.meetcute.id)}::text);`, args));
+  assert.equal(after.meetcute.title, 'Game Night');
+  const withDays = JSON.parse(psql(`set role anon; select public.create_meetcute(${lit({ ...base, dayTimes: { '2026-10-04': { startTime: '10:00', endTime: '12:00' } } })}::jsonb);`, args));
+  assert.ok(withDays.meetcute.dayTimes);
 });
 
 test('rejects bad MeetCutes', { skip }, () => {

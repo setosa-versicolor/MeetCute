@@ -61,9 +61,6 @@ create table if not exists meetcute.responses (
   unique (meetcute_id, name_key)
 );
 
--- Added later: optional different hours per day, { "2026-10-04": { "startTime": "10:00", "endTime": "14:00" } }.
-alter table meetcute.meetcutes add column if not exists day_times jsonb;
-
 alter table meetcute.meetcutes enable row level security;
 alter table meetcute.responses enable row level security;
 revoke all on meetcute.meetcutes, meetcute.responses from anon, authenticated;
@@ -111,10 +108,7 @@ language sql stable as $$
   else
     (select coalesce(array_agg(to_char(d, 'YYYY-MM-DD') || 'T' || lpad((t / 60)::text, 2, '0') || ':' || lpad((t % 60)::text, 2, '0') order by d, t), '{}')
        from unnest(m.dates) d,
-            -- each day's own hours if set, otherwise the usual hours
-            lateral (select meetcute.tmin(coalesce(m.day_times -> to_char(d, 'YYYY-MM-DD') ->> 'startTime', m.start_time)) as s,
-                            meetcute.tmin(coalesce(m.day_times -> to_char(d, 'YYYY-MM-DD') ->> 'endTime', m.end_time)) as e) w,
-            generate_series(w.s, w.e - m.slot_minutes, m.slot_minutes) t)
+            generate_series(meetcute.tmin(m.start_time), meetcute.tmin(m.end_time) - m.slot_minutes, m.slot_minutes) t)
   end
 $$;
 
@@ -142,7 +136,7 @@ language sql stable as $$
     'id', m.id, 'title', m.title, 'description', m.description, 'host', m.host, 'emoji', m.emoji,
     'mode', m.mode,
     'dates', (select jsonb_agg(to_char(d, 'YYYY-MM-DD') order by d) from unnest(m.dates) d),
-    'startTime', m.start_time, 'endTime', m.end_time, 'slotMinutes', m.slot_minutes, 'dayTimes', m.day_times,
+    'startTime', m.start_time, 'endTime', m.end_time, 'slotMinutes', m.slot_minutes,
     'timezone', m.timezone, 'locked', m.locked, 'createdAt', m.created_at,
     'responses', coalesce((
       select jsonb_agg(jsonb_build_object(
@@ -178,9 +172,6 @@ declare
   date_strs text[];
   s text;
   start_m int; end_m int;
-  day record;
-  day_obj jsonb := '{}';
-  ds int; de int;
 begin
   if payload is null or jsonb_typeof(payload) <> 'object' then perform meetcute.fail('Missing body'); end if;
 
@@ -215,24 +206,7 @@ begin
     m.slot_minutes := (payload->>'slotMinutes')::int;
     if start_m % m.slot_minutes <> 0 or end_m % m.slot_minutes <> 0 then perform meetcute.fail('Times must line up with the slot length'); end if;
     if end_m - start_m < m.slot_minutes then perform meetcute.fail('End time must be after start time'); end if;
-
-    -- Optional different hours for some days.
-    if payload->'dayTimes' is not null and jsonb_typeof(payload->'dayTimes') <> 'null' then
-      if jsonb_typeof(payload->'dayTimes') <> 'object' then perform meetcute.fail('dayTimes must be an object'); end if;
-      for day in select key, value from jsonb_each(payload->'dayTimes') loop
-        if not (day.key = any (date_strs)) then perform meetcute.fail('Per-day times must be for one of the picked dates'); end if;
-        if jsonb_typeof(day.value) <> 'object' then perform meetcute.fail('Times must look like HH:MM'); end if;
-        ds := meetcute.tmin(day.value->>'startTime');
-        de := meetcute.tmin(day.value->>'endTime');
-        if ds is null or de is null then perform meetcute.fail('Times must look like HH:MM'); end if;
-        if ds % m.slot_minutes <> 0 or de % m.slot_minutes <> 0 then perform meetcute.fail('Times must line up with the slot length'); end if;
-        if de - ds < m.slot_minutes then perform meetcute.fail('End time must be after start time'); end if;
-        day_obj := day_obj || jsonb_build_object(day.key, jsonb_build_object('startTime', day.value->>'startTime', 'endTime', day.value->>'endTime'));
-      end loop;
-      m.day_times := nullif(day_obj, '{}'::jsonb);
-    end if;
-
-    if cardinality(meetcute.slot_ids(m)) > 2500 then
+    if cardinality(m.dates) * ((end_m - start_m) / m.slot_minutes) > 2500 then
       perform meetcute.fail('That is a lot of slots! Try fewer dates or a shorter window.');
     end if;
   end if;

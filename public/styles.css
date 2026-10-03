@@ -259,6 +259,21 @@ a.mc-card[href]:hover { border-color: var(--line-strong); }
 .time-panel { margin-top: 16px; }
 .time-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .time-row label { font-weight: 600; font-size: .85rem; color: var(--muted); display: grid; gap: 4px; }
+.subhead { font-weight: 600; font-size: .85rem; color: var(--muted); margin: 0 0 4px; }
+.per-day-toggle { margin-top: 16px; }
+.day-times { margin-top: 10px; }
+.day-time-rows { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.day-time-row {
+  display: grid; grid-template-columns: 120px 1fr auto 1fr 52px; gap: 8px; align-items: center;
+  padding: 6px 8px; border-radius: var(--radius-sm); border: 1px solid transparent;
+}
+.day-time-row.changed { background: var(--accent-soft); border-color: var(--line); }
+.day-time-row .input { padding: 7px 10px; }
+.day-time-date { font-weight: 600; font-size: .92rem; }
+.day-time-to { color: var(--muted); font-size: .85rem; }
+.day-time-note { color: var(--muted); font-size: .8rem; text-align: right; }
+.link-btn { font: inherit; font-size: .82rem; font-weight: 600; color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer; text-align: right; }
+.link-btn:hover { text-decoration: underline; }
 
 /* meetcute header */
 .mc-header { display: flex; gap: 18px; align-items: flex-start; padding: 12px 0 22px; }
@@ -344,6 +359,14 @@ a.mc-card[href]:hover { border-color: var(--line-strong); }
   position: relative;
 }
 .time-grid .cell.hour { border-top: 1px solid var(--line-strong); }
+/* Hours outside a day's own window (different times per day). */
+.time-grid .cell.off {
+  cursor: default; touch-action: auto;
+  background: repeating-linear-gradient(135deg, transparent 0 5px, color-mix(in oklab, var(--line) 60%, transparent) 5px 6px);
+}
+.time-grid .gap { border-top: 6px solid var(--card) !important; box-shadow: inset 0 1px 0 var(--line-strong); }
+.time-grid .row-head.gap { box-shadow: none; }
+.time-grid .col-hours { display: block; font-size: .68rem; font-weight: 500; color: var(--muted); white-space: nowrap; margin-top: 2px; }
 .cell { cursor: pointer; touch-action: none; transition: background-color .1s, opacity .2s; }
 .cell:focus-visible { outline-offset: -2px; z-index: 2; }
 
@@ -541,6 +564,10 @@ a.mc-card[href]:hover { border-color: var(--line-strong); }
   .how-cards { grid-template-columns: 1fr; margin-top: 28px; }
   .mc-cards { grid-template-columns: 1fr; }
   .home-head .btn { width: 100%; }
+  .day-time-row { grid-template-columns: 1fr 1fr; }
+  .day-time-date { grid-column: 1 / -1; }
+  .day-time-to { display: none; }
+  .day-time-note, .day-time-row .link-btn { grid-column: 1 / -1; text-align: left; }
   .brushes { display: flex; width: 100%; }
   .brush { flex: 1; padding: 7px 6px; font-size: .85rem; }
 }

@@ -4,6 +4,7 @@
 
 1. **Create**: name your MeetCute (or get a suggestion), pick an icon, and choose dates on the calendar.
    Ask about **dates only** or **dates & times** (with Morning / Afternoon / Evening presets and 15/30/60-minute slots).
+   Times are the same every day by default; switch to **Different times per day** to give some days their own hours.
 2. **Share**: copy the link to your friends, send it by text or email, or use your phone's share sheet. Link previews show the MeetCute's name.
 3. **Respond**: each person types their name and click-drags (or taps) to mark *I'm free* or *If needed*.
    Typing the same name later brings back that person's picks so they can edit them.
@@ -41,6 +42,12 @@ You only do this once.
    - the **Publishable key** (`sb_publishable_…`), or on older projects the **anon public** key
 4. Put both into [`public/config.js`](public/config.js) and commit. You can edit the file right on GitHub
    with the pencil icon. Both values are safe to make public.
+
+**Updating the database later**
+
+When a new version of MeetCute needs database changes (for example, *Different times per day*), copy the latest
+[`supabase/schema.sql`](supabase/schema.sql) into **SQL Editor → New query** and click **Run** again. It's safe to
+re-run: existing MeetCutes and responses are kept. Until then, the site says when a feature needs the update.
 
 **2. Turn on GitHub Pages**
 

@@ -107,14 +107,30 @@ function validateMeetCute(body) {
   const mc = { title, description, host, emoji, mode, dates, timezone };
 
   if (mode === 'times') {
-    const start = Slots.timeToMin(body.startTime);
-    const end = Slots.timeToMin(body.endTime);
     const slotMinutes = Number(body.slotMinutes);
-    if (isNaN(start) || isNaN(end)) throw bad('Times must look like HH:MM');
     if (![15, 30, 60].includes(slotMinutes)) throw bad('Slot length must be 15, 30 or 60 minutes');
-    if (start % slotMinutes !== 0 || end % slotMinutes !== 0) throw bad('Times must line up with the slot length');
-    if (end - start < slotMinutes) throw bad('End time must be after start time');
+    const checkWindow = (startTime, endTime) => {
+      const start = Slots.timeToMin(startTime);
+      const end = Slots.timeToMin(endTime);
+      if (isNaN(start) || isNaN(end)) throw bad('Times must look like HH:MM');
+      if (start % slotMinutes !== 0 || end % slotMinutes !== 0) throw bad('Times must line up with the slot length');
+      if (end - start < slotMinutes) throw bad('End time must be after start time');
+    };
+    checkWindow(body.startTime, body.endTime);
     Object.assign(mc, { startTime: body.startTime, endTime: body.endTime, slotMinutes });
+
+    // Optional different hours for some days: { "2026-10-04": { startTime, endTime } }.
+    if (body.dayTimes != null) {
+      if (typeof body.dayTimes !== 'object' || Array.isArray(body.dayTimes)) throw bad('dayTimes must be an object');
+      const dayTimes = {};
+      for (const [date, w] of Object.entries(body.dayTimes)) {
+        if (!dates.includes(date)) throw bad('Per-day times must be for one of the picked dates');
+        if (!w || typeof w !== 'object') throw bad('Times must look like HH:MM');
+        checkWindow(w.startTime, w.endTime);
+        dayTimes[date] = { startTime: w.startTime, endTime: w.endTime };
+      }
+      if (Object.keys(dayTimes).length) mc.dayTimes = dayTimes;
+    }
     if (Slots.slotIds(mc).length > LIMITS.slots) throw bad('That is a lot of slots! Try fewer dates or a shorter window.');
   }
   return mc;
